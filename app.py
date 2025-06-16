@@ -503,10 +503,10 @@ def vehiculos_en_taller():
 def create_first_mecanico():
     # ESTA RUTA DEBE SER REMOVIDA INMEDIATAMENTE DESPUÉS DE USARSE EN PRODUCCIÓN.
     # NUNCA MANTENGAS RUTAS DE CREACIÓN DE USUARIOS EXPUESTAS.
-    username_admin = "admin_mecanico"
-    password_admin = "password_segura" # CAMBIA ESTO POR ALGO FUERTE
-    nombre_admin = "Admin"
-    apellido_admin = "Taller"
+    username_admin = "Beto"
+    password_admin = "1234" # CAMBIA ESTO POR ALGO FUERTE
+    nombre_admin = "Beto"
+    apellido_admin = "Esquivel"
     email_admin = "admin@taller.com"
     telefono_admin = "123456789"
 
