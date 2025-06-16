@@ -2,12 +2,13 @@ import sqlite3
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import gestor_datos
+import os
 # No se necesitan 'threading', 'webview', 'time' para el despliegue web
 
 app = Flask(__name__)
 # ¡IMPORTANTE! Cambia esta clave secreta por una cadena larga y aleatoria en producción.
 # En Render, esto se hará a través de una variable de entorno.
-app.secret_key = 'tu_clave_secreta_aqui_cambiala_siempre' # ¡Cámbiala por una real!
+app.secret_key = '123@456' # ¡Cámbiala por una real!
 
 # ==========================================================
 # 1. DECORADOR PARA REQUERIR INICIO DE SESIÓN
@@ -520,12 +521,11 @@ def create_first_mecanico():
 # PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (AJUSTADO PARA DESPLIEGUE WEB)
 # ==========================================================
 if __name__ == '__main__':
-    gestor_datos.crear_tablas() # Las tablas se crearán en la base de datos de Render la primera vez
+    gestor_datos.crear_tablas()
     
-    # Obtener el puerto de la variable de entorno 'PORT' de Render
-    # Si no está definida (ej. desarrollo local), usa el puerto 5000 por defecto
     port = int(os.environ.get("PORT", 5000))
     
-    # Ejecutar la aplicación Flask en todas las interfaces y el puerto proporcionado por Render
+    app.run(host="0.0.0.0", port=port, debug=False)
+
     # debug=False es CRÍTICO para producción
     app.run(host="0.0.0.0", port=port, debug=False)
