@@ -1,13 +1,12 @@
-import datetime
 import sqlite3
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import gestor_datos
-import threading # NUEVO: Para ejecutar Flask en un hilo separado
-import webview # NUEVO: Para crear la ventana de escritorio
-import time # NUEVO: Para dar tiempo al servidor Flask a iniciar
+# No se necesitan 'threading', 'webview', 'time' para el despliegue web
 
 app = Flask(__name__)
+# ¡IMPORTANTE! Cambia esta clave secreta por una cadena larga y aleatoria en producción.
+# En Render, esto se hará a través de una variable de entorno.
 app.secret_key = 'tu_clave_secreta_aqui_cambiala_siempre' # ¡Cámbiala por una real!
 
 # ==========================================================
@@ -443,6 +442,8 @@ def detalle_reparacion(reparacion_id):
         flash('Reparación no encontrada.', 'error')
         return redirect(url_for('vehiculos_en_taller'))
     
+    # Asegúrate de importar datetime si no está ya
+    from datetime import datetime 
     if reparacion['fecha_salida']:
         try:
             reparacion['fecha_salida_formato'] = datetime.strptime(reparacion['fecha_salida'], '%Y-%m-%d').strftime('%d/%m/%Y')
@@ -499,20 +500,10 @@ def vehiculos_en_taller():
 
 
 # ==========================================================
-# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (MODIFICADO PARA ESCRITORIO)
+# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (PARA DESPLIEGUE WEB)
 # ==========================================================
-def start_flask_app():
-    """Función para iniciar el servidor Flask."""
-    gestor_datos.crear_tablas() 
-    app.run(debug=False, host='127.0.0.1', port=5000)
-
 if __name__ == '__main__':
-    flask_thread = threading.Thread(target=start_flask_app)
-    flask_thread.daemon = True
-    flask_thread.start()
-
-    time.sleep(2) 
-
-    webview.create_window('Taller Mecánico (Mecánico)', 'http://127.0.0.1:5000', width=1200, height=800)
-    webview.start()
-
+    gestor_datos.crear_tablas() # Las tablas se crearán en la base de datos de Render la primera vez
+    # En un entorno de producción, Render/Gunicorn/Waitress usará esto para iniciar la aplicación.
+    # No especifiques host/port aquí, Render lo gestiona.
+    app.run(debug=False) 

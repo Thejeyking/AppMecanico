@@ -2,13 +2,11 @@ import os
 import bcrypt 
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import gestor_datos 
-import threading # NUEVO: Para ejecutar Flask en un hilo separado
-import webview # NUEVO: Para crear la ventana de escritorio
-import time # NUEVO: Para dar tiempo al servidor Flask a iniciar
+# No se necesitan 'threading', 'webview', 'time' para el despliegue web
 
 # Inicialización de la aplicación Flask para clientes
 cliente_app = Flask(__name__, static_folder='static_cliente', static_url_path='/static', template_folder='templates_cliente')
-cliente_app.secret_key = os.urandom(24).hex() 
+cliente_app.secret_key = os.urandom(24).hex() # Clave secreta para sesiones seguras
 
 # ==========================================================
 # CONFIGURACIÓN DE BASE DE DATOS Y TABLAS
@@ -31,7 +29,6 @@ def index_cliente():
 @cliente_app.route('/api/registro', methods=['POST'])
 def registro_api():
     data = request.get_json()
-    print(f"DEBUG_API: Datos JSON recibidos para registro: {data}")
     
     username = data.get('username')
     password = data.get('password')
@@ -40,10 +37,7 @@ def registro_api():
     
     dni = data.get('dni')
     
-    print(f"DEBUG_API: Valores extraídos para registro - Username: {username}, Nombre: {nombre_cliente}, Apellido: {apellido_cliente}, DNI: {dni}")
-
     if not username or not password or not nombre_cliente or not apellido_cliente:
-        print("DEBUG_API: Faltan datos requeridos (usuario, contraseña, nombre, apellido) para el registro.")
         return jsonify({'success': False, 'message': 'Faltan datos requeridos (usuario, contraseña, nombre, apellido).'}), 400
 
     success, message = gestor_datos.registrar_cliente_con_usuario(
@@ -58,7 +52,6 @@ def registro_api():
         return jsonify({'success': True, 'message': message})
     else:
         status_code = 409 if "ya existe" in message else 400
-        print(f"DEBUG_API: Fallo en el registro: {message}, Código de estado: {status_code}")
         return jsonify({'success': False, 'message': message}), status_code
     
 @cliente_app.route('/api/login', methods=['POST'])
@@ -136,19 +129,11 @@ def vehiculo_estado_activo_api(vehiculo_id):
     return jsonify({'success': False, 'message': 'No hay reparación activa para este vehículo.'})
 
 # ==========================================================
-# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (MODIFICADO PARA ESCRITORIO)
+# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (PARA DESPLIEGUE WEB)
 # ==========================================================
-def start_cliente_app():
-    gestor_datos.crear_tablas()
-    cliente_app.run(debug=False, host='127.0.0.1', port=5001)
-
 if __name__ == '__main__':
-    flask_thread = threading.Thread(target=start_cliente_app)
-    flask_thread.daemon = True 
-    flask_thread.start()
-
-    time.sleep(2) 
-
-    webview.create_window('Taller Mecánico (Cliente)', 'http://127.0.0.1:5001', width=1000, height=700)
-    webview.start()
+    gestor_datos.crear_tablas() # Las tablas se crearán en la base de datos de Render la primera vez
+    # En un entorno de producción, Render/Gunicorn/Waitress usará esto para iniciar la aplicación.
+    # No especifiques host/port aquí, Render lo gestiona.
+    cliente_app.run(debug=False)
 
