@@ -498,6 +498,23 @@ def vehiculos_en_taller():
     vehiculos = gestor_datos.obtener_vehiculos_en_taller()
     return render_template('vehiculos_en_taller.html', vehiculos=vehiculos)
 
+@app.route('/create_first_mecanico_once_only')
+def create_first_mecanico():
+    # ESTA RUTA DEBE SER REMOVIDA INMEDIATAMENTE DESPUÉS DE USARSE EN PRODUCCIÓN.
+    # NUNCA MANTENGAS RUTAS DE CREACIÓN DE USUARIOS EXPUESTAS.
+    username_admin = "admin_mecanico"
+    password_admin = "password_segura" # CAMBIA ESTO POR ALGO FUERTE
+    nombre_admin = "Admin"
+    apellido_admin = "Taller"
+    email_admin = "admin@taller.com"
+    telefono_admin = "123456789"
+
+    if gestor_datos.agregar_mecanico(nombre_admin, apellido_admin, telefono_admin, email_admin, username_admin, password_admin):
+        return "Primer mecánico admin creado exitosamente. ¡ELIMINA ESTA RUTA DE TU CÓDIGO AHORA!"
+    else:
+        # Si ya existe, puedes intentar manejar el caso, o simplemente retornar un mensaje
+        return "Error al crear el primer mecánico admin (posiblemente ya existe).", 409
+
 
 # ==========================================================
 # PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (PARA DESPLIEGUE WEB)
