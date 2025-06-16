@@ -517,10 +517,15 @@ def create_first_mecanico():
 
 
 # ==========================================================
-# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (PARA DESPLIEGUE WEB)
+# PUNTO DE ARRANQUE DE LA APLICACIÓN FLASK (AJUSTADO PARA DESPLIEGUE WEB)
 # ==========================================================
 if __name__ == '__main__':
     gestor_datos.crear_tablas() # Las tablas se crearán en la base de datos de Render la primera vez
-    # En un entorno de producción, Render/Gunicorn/Waitress usará esto para iniciar la aplicación.
-    # No especifiques host/port aquí, Render lo gestiona.
-    app.run(debug=False) 
+    
+    # Obtener el puerto de la variable de entorno 'PORT' de Render
+    # Si no está definida (ej. desarrollo local), usa el puerto 5000 por defecto
+    port = int(os.environ.get("PORT", 5000))
+    
+    # Ejecutar la aplicación Flask en todas las interfaces y el puerto proporcionado por Render
+    # debug=False es CRÍTICO para producción
+    app.run(host="0.0.0.0", port=port, debug=False)
