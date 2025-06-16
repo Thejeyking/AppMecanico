@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Clientes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <nav>
+            <ul>
+                <li><a href="/">Inicio</a></li>
+                <li><a href="/turnos">Turnos</a></li>
+                <li><a href="/clientes">Clientes</a></li>
+                <li><a href="/mecanicos">Mecánicos</a></li>
+                <li><a href="/en_taller">En Taller</a></li>
+            </ul>
+        </nav>
+
+{% block content %}
+<h2 class="section-title">Editar Mecánico</h2>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('modificar_mecanico_web', mecanico_id=mecanico.id) }}">
+        <div class="form-group">
+            <label for="nombre">Nombre:</label>
+            <input type="text" id="nombre" name="nombre" value="{{ mecanico.nombre }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="apellido">Apellido:</label>
+            <input type="text" id="apellido" name="apellido" value="{{ mecanico.apellido }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="dni">DNI:</label>
+            <input type="text" id="dni" name="dni" value="{{ mecanico.dni | default('') }}">
+        </div>
+
+        {# ELIMINA EL SIGUIENTE DIV SI ESTABA PRESENTE:
+        <div class="form-group">
+            <label for="especialidad">Especialidad (opcional):</label>
+            <input type="text" id="especialidad" name="especialidad" value="{{ mecanico.especialidad | default('') }}">
+        </div>
+        #}
+
+        <button type="submit" class="button">Guardar Cambios</button>
+    </form>
+</div>
+
+<a href="{{ url_for('mecanicos') }}" class="button">Volver a Mecánicos</a>
+{% endblock %}

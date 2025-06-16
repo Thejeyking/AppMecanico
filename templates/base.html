@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Mi Taller Mecánico{% endblock %}</title>
+    
+    {# Tailwind CSS CDN: Es crucial que esta línea esté presente y correcta #}
+    <script src="https://cdn.tailwindcss.com"></script> 
+    
+    {# Tu archivo CSS personalizado (asegúrate de que la ruta sea correcta: /static/style.css) #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Puedes añadir aquí estilos globales que no quieras en Tailwind o para sobrescribir */
+        .flash-message {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            font-size: 0.875rem; /* text-sm */
+        }
+        .flash-success { background-color: #d1fae5; color: #065f46; /* green-100, green-800 */ }
+        .flash-error { background-color: #fee2e2; color: #991b1b; /* red-100, red-800 */ }
+        .flash-warning { background-color: #fffbeb; color: #92400e; /* yellow-100, yellow-800 */ }
+        .flash-info { background-color: #e0f2fe; color: #0369a1; /* blue-100, blue-800 */ }
+    </style>
+    {% block head_extra %}{% endblock %} {# Para añadir CSS/JS extra en el head de templates hijos #}
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal min-h-screen flex flex-col">
+
+    {# Barra de navegación #}
+    <nav class="bg-blue-700 p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <a href="{{ url_for('dashboard') }}" class="text-white text-2xl font-bold rounded-lg hover:bg-blue-800 p-2 transition duration-300">
+                Taller Mecánico
+            </a>
+            <div class="space-x-4">
+                <a href="{{ url_for('dashboard') }}" class="text-white hover:text-blue-200 text-lg p-2 rounded-md transition duration-300">Inicio</a>
+                <a href="{{ url_for('lista_turnos') }}" class="text-white hover:text-blue-200 text-lg p-2 rounded-md transition duration-300">Turnos</a>
+                <a href="{{ url_for('clientes') }}" class="text-white hover:text-blue-200 text-lg p-2 rounded-md transition duration-300">Clientes</a>
+                <a href="{{ url_for('mecanicos') }}" class="text-white hover:text-blue-200 text-lg p-2 rounded-md transition duration-300">Mecánicos</a>
+                {# ¡NUEVA OPCIÓN EN LA BARRA DE NAVEGACIÓN! #}
+                <a href="{{ url_for('en_taller') }}" class="text-white hover:text-blue-200 text-lg p-2 rounded-md transition duration-300">En Taller</a>
+                <a href="{{ url_for('logout_mecanico') }}" class="bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition duration-300">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    {# Contenido principal de la página #}
+    <main class="container mx-auto mt-8 p-4 flex-grow">
+        {# Sección para mensajes flash de Flask #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-4">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %} {# Aquí se inyecta el contenido de las plantillas hijas #}
+    </main>
+
+    {# Pie de página #}
+    <footer class="mt-12 py-4 text-center text-gray-600 border-t border-gray-300">
+        &copy; 2025 Mi Taller Mecánico. Todos los derechos reservados.
+    </footer>
+
+</body>
+</html>

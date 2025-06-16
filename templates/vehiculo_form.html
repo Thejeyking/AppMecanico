@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ accion }} Vehículo {% if cliente %}para {{ cliente.nombre }} {{ cliente.apellido }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-md mx-auto">
+    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">{{ accion }} Vehículo</h2>
+    {% if cliente %}
+        <p class="text-center text-gray-600 mb-4">Para Cliente: {{ cliente.nombre }} {{ cliente.apellido }} (ID: {{ cliente.id }})</p>
+    {% endif %}
+
+    <form method="POST" action="{% if vehiculo %}{{ url_for('modificar_vehiculo', vehiculo_id=vehiculo.id) }}{% else %}{{ url_for('agregar_vehiculo_web', cliente_id=cliente.id) }}{% endif %}" class="space-y-4">
+        
+        <div class="form-group">
+            <label for="patente" class="block text-gray-700 text-sm font-bold mb-2">Patente:</label>
+            <input type="text" id="patente" name="patente" value="{{ vehiculo.patente if vehiculo else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="marca" class="block text-gray-700 text-sm font-bold mb-2">Marca:</label>
+            <input type="text" id="marca" name="marca" value="{{ vehiculo.marca if vehiculo else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="modelo" class="block text-gray-700 text-sm font-bold mb-2">Modelo:</label>
+            <input type="text" id="modelo" name="modelo" value="{{ vehiculo.modelo if vehiculo else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="anio" class="block text-gray-700 text-sm font-bold mb-2">Año:</label>
+            <input type="number" id="anio" name="anio" value="{{ vehiculo.anio if vehiculo else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="kilometraje_inicial" class="block text-gray-700 text-sm font-bold mb-2">Kilometraje Inicial:</label>
+            <input type="number" id="kilometraje_inicial" name="kilometraje_inicial" value="{{ vehiculo.kilometraje_inicial if vehiculo else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition duration-300">
+            {{ 'Guardar Cambios' if vehiculo else 'Agregar Vehículo' }}
+        </button>
+        <a href="{% if cliente %}{{ url_for('detalle_cliente', cliente_id=cliente.id) }}{% else %}{{ url_for('clientes') }}{% endif %}" class="w-full text-center block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300 mt-2">
+            Cancelar
+        </a>
+    </form>
+</div>
+{% endblock %}

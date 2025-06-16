@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de Reparación - ID {{ reparacion.id }}{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 mb-8 mx-auto max-w-4xl">
+    <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Detalle de Reparación (ID: {{ reparacion.id }})</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {# Información del Vehículo #}
+        <div class="bg-blue-50 p-6 rounded-lg shadow-sm border border-blue-200">
+            <h3 class="text-xl font-semibold text-blue-800 mb-3">Información del Vehículo</h3>
+            <p><strong>Cliente:</strong> {{ reparacion.nombre_cliente }} {{ reparacion.apellido_cliente }} (DNI: {{ reparacion.dni_cliente | default('N/A') }})</p>
+            <p><strong>Vehículo:</strong> {{ reparacion.marca }} {{ reparacion.modelo }}</p>
+            <p><strong>Patente:</strong> {{ reparacion.patente }}</p>
+            <p><strong>Año:</strong> {{ reparacion.anio }}</p>
+            <a href="{{ url_for('detalle_cliente', cliente_id=reparacion.cliente_id) }}" class="text-blue-600 hover:underline mt-2 inline-block text-sm">Ver Cliente</a>
+            <span class="mx-1">|</span>
+            <a href="{{ url_for('historial_vehiculo', vehiculo_id=reparacion.vehiculo_id) }}" class="text-blue-600 hover:underline mt-2 inline-block text-sm">Ver Historial del Vehículo</a>
+        </div>
+
+        {# Detalles de la Reparación #}
+        <div class="bg-green-50 p-6 rounded-lg shadow-sm border border-green-200">
+            <h3 class="text-xl font-semibold text-green-800 mb-3">Detalles de la Reparación</h3>
+            <p><strong>Fecha Ingreso:</strong> {{ reparacion.fecha_ingreso }}</p>
+            <p><strong>Kilometraje Ingreso:</strong> {{ reparacion.kilometraje_ingreso }} km</p>
+            <p><strong>Fecha Salida:</strong> {{ reparacion.fecha_salida | default('Pendiente') }}</p>
+            <p><strong>Kilometraje Salida:</strong> {{ reparacion.kilometraje_salida | default('N/A') }} km</p>
+            <p><strong>Mecánico Asignado:</strong> {{ reparacion.nombre_mecanico | default('N/A') }} {{ reparacion.apellido_mecanico | default('') }}</p>
+            <p><strong>Estado:</strong> <span class="font-bold {% if reparacion.estado == 'Completado' %}text-green-700{% elif reparacion.estado == 'En Progreso' %}text-yellow-700{% elif reparacion.estado == 'Pendiente' %}text-orange-700{% elif reparacion.estado == 'En Espera de Repuestos' %}text-purple-700{% else %}text-red-700{% endif %}">{{ reparacion.estado }}</span></p>
+            {% if reparacion.turno_origen_id %}
+                <p class="text-sm text-gray-600 mt-2">Origen: Turno ID <a href="{{ url_for('modificar_turno_web', turno_id=reparacion.turno_origen_id) }}" class="text-blue-600 hover:underline">{{ reparacion.turno_origen_id }}</a></p>
+            {% else %}
+                <p class="text-sm text-gray-600 mt-2">Origen: Ingreso Directo</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Problema Reportado y Trabajos #}
+    <div class="bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-200 mb-8">
+        <h3 class="text-xl font-semibold text-gray-800 mb-3">Descripción de la Reparación</h3>
+        <p class="mb-3"><strong>Problema Reportado:</strong> {{ reparacion.problema_reportado | default('No especificado') }}</p>
+        <p class="mb-3"><strong>Trabajos Realizados:</strong> {{ reparacion.trabajos_realizados | default('Aún no especificados') }}</p>
+        <p><strong>Repuestos Usados:</strong> {{ reparacion.repuestos_usados | default('Ninguno') }}</p>
+    </div>
+
+    {# Costos #}
+    <div class="bg-indigo-50 p-6 rounded-lg shadow-sm border border-indigo-200 mb-8">
+        <h3 class="text-xl font-semibold text-indigo-800 mb-3">Costos</h3>
+        <p><strong>Costo Mano de Obra:</strong> ${{ reparacion.costo_mano_obra | default('0.00') }}</p>
+        <p class="text-2xl font-bold mt-3"><strong>Costo Total:</strong> ${{ reparacion.costo_total | default('0.00') }}</p>
+    </div>
+
+    {# Botones de Acción #}
+    <div class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+        <a href="{{ url_for('modificar_reparacion_web', reparacion_id=reparacion.id) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition duration-300 text-center">
+            Modificar Reparación
+        </a>
+        <a href="{{ url_for('historial_vehiculo', vehiculo_id=reparacion.vehiculo_id) }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300 text-center">
+            Volver al Historial del Vehículo
+        </a>
+        {# Si la reparación es activa, puedes ofrecer opción para finalizarla o cancelar #}
+        {% if reparacion.estado in ['En Progreso', 'Pendiente', 'En Espera de Repuestos'] %}
+            <form action="{{ url_for('finalizar_reparacion_web', reparacion_id=reparacion.id) }}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres finalizar esta reparación?');">
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition duration-300 text-center">
+                    Finalizar Reparación
+                </button>
+            </form>
+            {# Puedes añadir un botón para cancelar si es necesario #}
+            {#
+            <form action="{{ url_for('cancelar_reparacion_web', reparacion_id=reparacion.id) }}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres cancelar esta reparación?');">
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition duration-300 text-center">
+                    Cancelar Reparación
+                </button>
+            </form>
+            #}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

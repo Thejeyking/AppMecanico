@@ -1,0 +1,10 @@
+/* static_cliente/style.css */
+
+/* Esto es un archivo CSS muy básico para la aplicación del cliente. */
+/* La mayoría de los estilos provienen de Tailwind CSS, cargado vía CDN. */
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Puedes añadir estilos personalizados aquí si es necesario */

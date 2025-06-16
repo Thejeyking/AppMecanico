@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestión de Mecánicos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 mb-8">
+    <h2 class="text-3xl font-bold text-gray-800 mb-4">Gestión de Mecánicos</h2>
+    {# La ruta para agregar mecánico está temporalmente sin @login_required para el primer registro #}
+    <a href="{{ url_for('agregar_mecanico_web') }}" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300 mb-4 inline-block">
+        Agregar Nuevo Mecánico
+    </a>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead class="bg-blue-600 text-white">
+                <tr>
+                    <th class="py-3 px-4 text-left">ID</th>
+                    <th class="py-3 px-4 text-left">Nombre</th>
+                    <th class="py-3 px-4 text-left">Apellido</th>
+                    <th class="py-3 px-4 text-left">Teléfono</th>
+                    <th class="py-3 px-4 text-left">Email</th>
+                    <th class="py-3 px-4 text-left">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if mecanicos %}
+                    {% for mecanico in mecanicos %}
+                        <tr class="hover:bg-gray-50 border-b border-gray-200">
+                            <td class="py-3 px-4">{{ mecanico.id }}</td>
+                            <td class="py-3 px-4">{{ mecanico.nombre }}</td>
+                            <td class="py-3 px-4">{{ mecanico.apellido }}</td>
+                            <td class="py-3 px-4">{{ mecanico.telefono | default('N/A') }}</td>
+                            <td class="py-3 px-4">{{ mecanico.email | default('N/A') }}</td>
+                            <td class="py-3 px-4">
+                                <div class="flex space-x-2"> 
+                                    <a href="{{ url_for('modificar_mecanico_web', mecanico_id=mecanico.id) }}" 
+                                       class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded text-sm transition duration-300">
+                                        Modificar
+                                    </a>
+                                    <form action="{{ url_for('eliminar_mecanico_web', mecanico_id=mecanico.id) }}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar este mecánico?');">
+                                        <button type="submit" 
+                                                class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm transition duration-300">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="py-3 px-4 text-center text-gray-500">No hay mecánicos registrados.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

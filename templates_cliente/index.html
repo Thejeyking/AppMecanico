@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taller Mecánico - Clientes</title>
+    {# Carga de Tailwind CSS desde CDN #}
+    <script src="https://cdn.tailwindcss.com"></script>
+    {# Enlace a tu archivo CSS personalizado. Flask buscará 'style.css' en 'static_cliente' bajo '/static'. #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .flash-message {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        .flash-success { background-color: #d1fae5; color: #065f46; }
+        .flash-error { background-color: #fee2e2; color: #991b1b; }
+        .flash-warning { background-color: #fffbeb; color: #92400e; }
+        .flash-info { background-color: #e0f2fe; color: #0369a1; }
+    </style>
+    {# Carga de las librerías de React y ReactDOM desde CDN. ¡CRÍTICO: Deben cargarse ANTES de bundle.js! #}
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    {# Este div es el punto de montaje para tu aplicación React. #}
+    <div id="root" class="w-full max-w-4xl mx-auto">
+        {# Este contenido se muestra mientras React se carga o si falla en montarse. #}
+        <div class="text-center p-8 text-gray-500">Cargando aplicación... Si esto tarda, verifica tu conexión a internet o la consola de errores del navegador.</div>
+    </div>
+    
+    {# Tu script JavaScript (React). ¡CORRECCIÓN CLAVE: La ruta debe ser /static/bundle.js! #}
+    <script src="/static/bundle.js"></script>
+
+</body>
+</html>

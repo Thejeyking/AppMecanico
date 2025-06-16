@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar Ingreso al Taller{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-lg mx-auto">
+    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Registrar Ingreso de Vehículo al Taller</h2>
+
+    <form method="POST" action="{{ url_for('registrar_reparacion_directa_web') }}" class="space-y-4">
+        
+        <div class="form-group">
+            <label for="cliente_id" class="block text-gray-700 text-sm font-bold mb-2">Cliente Existente:</label>
+            <select id="cliente_id" name="cliente_id" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">Seleccione un cliente</option>
+                {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}">
+                        {{ cliente.nombre }} {{ cliente.apellido }} (DNI: {{ cliente.dni }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="vehiculo_id" class="block text-gray-700 text-sm font-bold mb-2">Vehículo del Cliente:</label>
+            <select id="vehiculo_id" name="vehiculo_id" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">Seleccione un vehículo</option>
+                {# Este select se llenará dinámicamente con JavaScript #}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+                (Seleccione primero un cliente para ver sus vehículos.)
+            </p>
+        </div>
+
+        <div class="form-group">
+            <label for="mecanico_id" class="block text-gray-700 text-sm font-bold mb-2">Mecánico Asignado (opcional):</label>
+            <select id="mecanico_id" name="mecanico_id" 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">(Sin asignar)</option>
+                {% for mecanico in mecanicos %}
+                    <option value="{{ mecanico.id }}">{{ mecanico.nombre }} {{ mecanico.apellido }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="fecha_ingreso" class="block text-gray-700 text-sm font-bold mb-2">Fecha de Ingreso:</label>
+            <input type="date" id="fecha_ingreso" name="fecha_ingreso" value="{{ today_date }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="form-group">
+            <label for="kilometraje_ingreso" class="block text-gray-700 text-sm font-bold mb-2">Kilometraje de Ingreso:</label>
+            <input type="number" id="kilometraje_ingreso" name="kilometraje_ingreso" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="form-group">
+            <label for="problema_reportado" class="block text-gray-700 text-sm font-bold mb-2">Problema Reportado:</label>
+            <textarea id="problema_reportado" name="problema_reportado" rows="4" required 
+                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition duration-300">
+            Registrar Ingreso
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="w-full text-center block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300 mt-2">
+            Cancelar
+        </a>
+    </form>
+
+    {# Script para cargar vehículos dinámicamente #}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const clienteSelect = document.getElementById('cliente_id');
+            const vehiculoSelect = document.getElementById('vehiculo_id');
+            const todayDate = new Date().toISOString().split('T')[0];
+            document.getElementById('fecha_ingreso').value = todayDate;
+
+            function loadVehiculos(clienteId) {
+                if (clienteId) {
+                    fetch(`/api/cliente/${clienteId}/vehiculos`) 
+                        .then(response => response.json())
+                        .then(data => {
+                            vehiculoSelect.innerHTML = '<option value="">Seleccione un vehículo</option>';
+                            if (data.success && data.vehiculos) {
+                                data.vehiculos.forEach(vehiculo => {
+                                    const option = document.createElement('option');
+                                    option.value = vehiculo.id;
+                                    option.textContent = `${vehiculo.marca} ${vehiculo.modelo} (Patente: ${vehiculo.patente})`;
+                                    vehiculoSelect.appendChild(option);
+                                });
+                            } else {
+                                console.warn('No se encontraron vehículos para el cliente:', data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error al cargar vehículos:', error);
+                            vehiculoSelect.innerHTML = '<option value="">Error al cargar vehículos</option>';
+                        });
+                } else {
+                    vehiculoSelect.innerHTML = '<option value="">Seleccione un cliente primero</option>';
+                }
+            }
+
+            clienteSelect.addEventListener('change', function() {
+                loadVehiculos(this.value);
+            });
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ accion }}{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-md mx-auto">
+    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">{{ accion }}</h2>
+
+    <form method="POST" action="{% if turno %}{{ url_for('modificar_turno_web', turno_id=turno.id) }}{% else %}{{ url_for('agregar_turno_web') }}{% endif %}" class="space-y-4">
+        
+        <div class="form-group">
+            <label for="cliente_id" class="block text-gray-700 text-sm font-bold mb-2">Cliente:</label>
+            <select id="cliente_id" name="cliente_id" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">Seleccione un cliente</option>
+                {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if turno and turno.cliente_id == cliente.id %}selected{% endif %}>
+                        {{ cliente.nombre }} {{ cliente.apellido }} (DNI: {{ cliente.dni }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="vehiculo_id" class="block text-gray-700 text-sm font-bold mb-2">Vehículo:</label>
+            <select id="vehiculo_id" name="vehiculo_id" required 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">Seleccione un vehículo</option>
+                {# Si se está modificando un turno y ya hay vehículos cargados para ese cliente #}
+                {% if turno and vehiculos %}
+                    {% for vehiculo_option in vehiculos %}
+                        <option value="{{ vehiculo_option.id }}" {% if turno.vehiculo_id == vehiculo_option.id %}selected{% endif %}>
+                            {{ vehiculo_option.marca }} {{ vehiculo_option.modelo }} (Patente: {{ vehiculo_option.patente }})
+                        </option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+                (El listado de vehículos se actualizará al seleccionar un cliente si hay JavaScript para ello.)
+            </p>
+        </div>
+
+        <div class="form-group">
+            <label for="mecanico_id" class="block text-gray-700 text-sm font-bold mb-2">Mecánico Asignado:</label>
+            <select id="mecanico_id" name="mecanico_id" 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="">(Sin asignar)</option>
+                {% for mecanico_option in mecanicos %}
+                    <option value="{{ mecanico_option.id }}" {% if turno and turno.mecanico_id == mecanico_option.id %}selected{% endif %}>
+                        {{ mecanico_option.nombre }} {{ mecanico_option.apellido }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="fecha" class="block text-gray-700 text-sm font-bold mb-2">Fecha del Turno:</label>
+            <input type="date" id="fecha" name="fecha" value="{{ turno.fecha if turno else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="form-group">
+            <label for="hora" class="block text-gray-700 text-sm font-bold mb-2">Hora del Turno:</label>
+            <input type="time" id="hora" name="hora" value="{{ turno.hora if turno else '09:00' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="form-group">
+            <label for="problema_reportado" class="block text-gray-700 text-sm font-bold mb-2">Problema Reportado:</label>
+            <textarea id="problema_reportado" name="problema_reportado" rows="4" required 
+                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">{{ turno.problema_reportado if turno else '' }}</textarea>
+        </div>
+
+        {# Campo de estado solo si estamos modificando un turno #}
+        {% if turno %}
+        <div class="form-group">
+            <label for="estado" class="block text-gray-700 text-sm font-bold mb-2">Estado del Turno:</label>
+            <select id="estado" name="estado" 
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="Agendado" {% if turno.estado == 'Agendado' %}selected{% endif %}>Agendado</option>
+                <option value="En Progreso" {% if turno.estado == 'En Progreso' %}selected{% endif %}>En Progreso</option> {# NUEVO #}
+                <option value="Completado" {% if turno.estado == 'Completado' %}selected{% endif %}>Completado</option>
+                <option value="Cancelado" {% if turno.estado == 'Cancelado' %}selected{% endif %}>Cancelado</option>
+            </select>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition duration-300">
+            {{ 'Guardar Cambios' if turno else 'Agendar Turno' }}
+        </button>
+        <a href="{{ url_for('lista_turnos') }}" class="w-full text-center block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300 mt-2">
+            Cancelar
+        </a>
+    </form>
+</div>
+
+{# Script para cargar vehículos dinámicamente: Opcional, pero recomendado #}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const clienteSelect = document.getElementById('cliente_id');
+        const vehiculoSelect = document.getElementById('vehiculo_id');
+
+        function loadVehiculos(clienteId, initialVehiculoId = null) {
+            if (clienteId) {
+                fetch(`/api/cliente/${clienteId}/vehiculos`) 
+                    .then(response => response.json())
+                    .then(data => {
+                        vehiculoSelect.innerHTML = '<option value="">Seleccione un vehículo</option>';
+                        if (data.success && data.vehiculos) {
+                            data.vehiculos.forEach(vehiculo => {
+                                const option = document.createElement('option');
+                                option.value = vehiculo.id;
+                                option.textContent = `${vehiculo.marca} ${vehiculo.modelo} (Patente: ${vehiculo.patente})`;
+                                vehiculoSelect.appendChild(option);
+                            });
+                            if (initialVehiculoId) {
+                                vehiculoSelect.value = initialVehiculoId;
+                            }
+                        } else {
+                            console.warn('No se encontraron vehículos para el cliente:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error al cargar vehículos:', error);
+                        vehiculoSelect.innerHTML = '<option value="">Error al cargar vehículos</option>';
+                    });
+            } else {
+                vehiculoSelect.innerHTML = '<option value="">Seleccione un cliente primero</option>';
+            }
+        }
+
+        clienteSelect.addEventListener('change', function() {
+            loadVehiculos(this.value);
+        });
+
+        // Cargar vehículos iniciales al cargar la página si ya hay un cliente seleccionado (ej. en modo modificar)
+        const initialClienteId = clienteSelect.value;
+        const initialVehiculoIdFromTurno = "{{ turno.vehiculo_id if turno else '' }}";
+
+        if (initialClienteId) {
+            loadVehiculos(initialClienteId, initialVehiculoIdFromTurno);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Historial de Reparaciones - {{ vehiculo.patente }}{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 mb-8 mx-auto max-w-4xl">
+    <h2 class="text-3xl font-bold text-gray-800 mb-4 text-center">Historial de Reparaciones para el Vehículo: {{ vehiculo.patente }}</h2>
+    <p class="text-xl text-gray-700 mb-2">{{ vehiculo.marca }} {{ vehiculo.modelo }} (Año: {{ vehiculo.anio }})</p>
+    <p class="text-lg text-gray-600 mb-6">Cliente: {{ vehiculo.nombre_cliente | default('N/A') }} {{ vehiculo.apellido_cliente | default('') }}</p>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead class="bg-blue-600 text-white">
+                <tr>
+                    <th class="py-3 px-4 text-left">ID Rep.</th>
+                    <th class="py-3 px-4 text-left">Fecha Ingreso</th>
+                    <th class="py-3 px-4 text-left">KM Ingreso</th>
+                    <th class="py-3 px-4 text-left">Problema Reportado</th>
+                    <th class="py-3 px-4 text-left">Trabajo Realizado</th>
+                    <th class="py-3 px-4 text-left">Mecánico</th>
+                    <th class="py-3 px-4 text-left">Estado</th>
+                    <th class="py-3 px-4 text-left">Costo Total</th>
+                    <th class="py-3 px-4 text-left">Origen</th> {# Nuevo campo para ver si es de turno o directa #}
+                    <th class="py-3 px-4 text-left">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if historial %}
+                    {% for reparacion in historial %}
+                    <tr class="hover:bg-gray-50 border-b border-gray-200">
+                        <td class="py-3 px-4">{{ reparacion.id }}</td>
+                        <td class="py-3 px-4">{{ reparacion.fecha_ingreso }}</td>
+                        <td class="py-3 px-4">{{ reparacion.kilometraje_ingreso }} km</td>
+                        <td class="py-3 px-4">{{ reparacion.problema_reportado | default('N/A') }}</td>
+                        <td class="py-3 px-4">{{ reparacion.trabajos_realizados | default('N/A') }}</td>
+                        <td class="py-3 px-4">{{ reparacion.nombre_mecanico | default('Sin Asignar') }} {{ reparacion.apellido_mecanico | default('') }}</td>
+                        <td class="py-3 px-4">
+                            <span class="font-bold 
+                                {% if reparacion.estado == 'Completado' %}text-green-700
+                                {% elif reparacion.estado == 'En Progreso' %}text-yellow-700
+                                {% elif reparacion.estado == 'Pendiente' %}text-orange-700
+                                {% elif reparacion.estado == 'En Espera de Repuestos' %}text-purple-700
+                                {% else %}text-red-700
+                                {% endif %}">
+                                {{ reparacion.estado }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">${{ reparacion.costo_total | default('0.00') }}</td>
+                        <td class="py-3 px-4">
+                            {% if reparacion.turno_origen_id %}
+                                Turno ID <a href="{{ url_for('modificar_turno_web', turno_id=reparacion.turno_origen_id) }}" class="text-blue-600 hover:underline">{{ reparacion.turno_origen_id }}</a>
+                            {% else %}
+                                Directa
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-4">
+                            <div class="flex space-x-2">
+                                <a href="{{ url_for('detalle_reparacion_web', reparacion_id=reparacion.id) }}" class="bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded text-sm transition duration-300">Ver Detalle</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="10" class="py-3 px-4 text-center text-gray-500">No hay historial de reparaciones para este vehículo.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="mt-6 text-center">
+    <a href="{{ url_for('detalle_cliente', cliente_id=vehiculo.cliente_id) }}" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300">Volver a Detalles del Cliente</a>
+</div>
+{% endblock %}

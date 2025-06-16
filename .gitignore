@@ -1,0 +1,16 @@
+.gitignore# Entorno virtual
+venv/
+*.pyc
+__pycache__/
+
+# Archivos de PyInstaller
+build/
+dist/
+*.spec
+
+# Base de datos local (si usas PostgreSQL en la nube, no necesitas subir el .db local)
+taller_mecanico.db
+
+# Claves de sesión (para Flask, aunque la estamos configurando como variable de entorno)
+.flaskenv
+.env

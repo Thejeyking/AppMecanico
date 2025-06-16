@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Gestión de Turnos{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-md rounded-lg p-6 mb-8">
+    <h2 class="text-3xl font-bold text-gray-800 mb-4">Gestión de Turnos</h2>
+    <a href="{{ url_for('agregar_turno_web') }}" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded transition duration-300 mb-4 inline-block">
+        Agendar Nuevo Turno
+    </a>
+
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead class="bg-blue-600 text-white">
+                <tr>
+                    <th class="py-3 px-4 text-left">ID</th>
+                    <th class="py-3 px-4 text-left">Cliente</th>
+                    <th class="py-3 px-4 text-left">Vehículo (Patente)</th>
+                    <th class="py-3 px-4 text-left">Mecánico</th>
+                    <th class="py-3 px-4 text-left">Fecha</th>
+                    <th class="py-3 px-4 text-left">Hora</th>
+                    <th class="py-3 px-4 text-left">Problema Reportado</th>
+                    <th class="py-3 px-4 text-left">Estado</th>
+                    <th class="py-3 px-4 text-left">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if turnos %}
+                    {% for turno in turnos %}
+                        <tr class="hover:bg-gray-50 border-b border-gray-200">
+                            <td class="py-3 px-4">{{ turno.id }}</td>
+                            <td class="py-3 px-4">{{ turno.nombre_cliente }} {{ turno.apellido_cliente }}</td>
+                            <td class="py-3 px-4">{{ turno.marca }} {{ turno.modelo }} ({{ turno.patente }})</td>
+                            <td class="py-3 px-4">{{ turno.nombre_mecanico | default('Sin Asignar') }} {{ turno.apellido_mecanico | default('') }}</td>
+                            <td class="py-3 px-4">{{ turno.fecha }}</td>
+                            <td class="py-3 px-4">{{ turno.hora }}</td>
+                            <td class="py-3 px-4">{{ turno.problema_reportado }}</td>
+                            <td class="py-3 px-4">
+                                <span class="font-bold 
+                                    {% if turno.estado == 'Agendado' %}text-blue-700
+                                    {% elif turno.estado == 'En Progreso' %}text-yellow-700
+                                    {% elif turno.estado == 'Cancelado' %}text-red-700
+                                    {% endif %}">
+                                    {{ turno.estado }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4">
+                                <div class="flex space-x-2">
+                                    <a href="{{ url_for('modificar_turno_web', turno_id=turno.id) }}" 
+                                       class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-3 rounded text-sm transition duration-300">
+                                        Modificar
+                                    </a>
+                                    <form action="{{ url_for('eliminar_turno_web', turno_id=turno.id) }}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres eliminar este turno?');">
+                                        <button type="submit" 
+                                                class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded text-sm transition duration-300">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="py-3 px-4 text-center text-gray-500">No hay turnos agendados con estado 'Agendado', 'En Progreso' o 'Cancelado'.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

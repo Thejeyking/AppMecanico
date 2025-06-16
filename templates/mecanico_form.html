@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ accion }} Mecánico{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-md mx-auto">
+    <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">{{ accion }} Mecánico</h2>
+
+    <form method="POST" action="{% if mecanico %}{{ url_for('modificar_mecanico_web', mecanico_id=mecanico.id) }}{% else %}{{ url_for('agregar_mecanico_web') }}{% endif %}" class="space-y-4">
+        <div class="form-group">
+            <label for="nombre" class="block text-gray-700 text-sm font-bold mb-2">Nombre:</label>
+            <input type="text" id="nombre" name="nombre" value="{{ mecanico.nombre if mecanico else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="apellido" class="block text-gray-700 text-sm font-bold mb-2">Apellido:</label>
+            <input type="text" id="apellido" name="apellido" value="{{ mecanico.apellido if mecanico else '' }}" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="telefono" class="block text-gray-700 text-sm font-bold mb-2">Teléfono:</label>
+            <input type="text" id="telefono" name="telefono" value="{{ mecanico.telefono if mecanico else '' }}" 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email:</label>
+            <input type="email" id="email" name="email" value="{{ mecanico.email if mecanico else '' }}" 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        {# Usuario y Contraseña solo se piden al agregar un nuevo mecánico #}
+        {% if not mecanico %}
+        <div class="form-group">
+            <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Usuario:</label>
+            <input type="text" id="username" name="username" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="form-group">
+            <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Contraseña:</label>
+            <input type="password" id="password" name="password" required 
+                   class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        {% endif %}
+
+        <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 transition duration-300">
+            {{ 'Guardar Cambios' if mecanico else 'Agregar Mecánico' }}
+        </button>
+        <a href="{{ url_for('mecanicos') }}" class="w-full text-center block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300 mt-2">
+            Cancelar
+        </a>
+    </form>
+</div>
+{% endblock %}
