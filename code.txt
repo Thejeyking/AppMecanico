@@ -1,0 +1,930 @@
+import sqlite3
+import bcrypt # Necesario para hashear contraseñas
+
+DATABASE = 'taller_mecanico.db'
+
+def obtener_conexion():
+    """Establece y devuelve una conexión a la base de datos SQLite."""
+    conn = None
+    try:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row # Permite acceder a las columnas por nombre (ej. fila['nombre'])
+    except sqlite3.Error as e:
+        print(f"Error al conectar a la base de datos: {e}")
+    return conn
+
+def tablas(): # Nombre de función corregido
+    """
+    Crea las tablas necesarias en la base de datos si no existen.
+    Define la estructura completa de todas las tablas con sus relaciones.
+    """
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+
+            # Tabla Clientes
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    apellido TEXT NOT NULL,
+                    telefono TEXT,
+                    email TEXT,
+                    dni TEXT UNIQUE
+                )
+            ''')
+
+            # Tabla Usuarios_Clientes (para login de clientes)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS usuarios_clientes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cliente_id INTEGER UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL, -- Aquí se almacenará el hash de la contraseña
+                    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+                )
+            ''')
+
+            # Tabla Mecanicos (Solo datos personales del mecánico, sin credenciales de login aquí)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS mecanicos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    apellido TEXT NOT NULL,
+                    telefono TEXT,
+                    email TEXT
+                )
+            ''')
+
+            # Tabla Usuarios_Mecanicos (Credenciales de login para mecánicos)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS usuarios_mecanicos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    mecanico_id INTEGER UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL, -- Aquí se almacenará el hash de la contraseña
+                    FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE CASCADE
+                )
+            ''')
+
+            # Tabla Vehiculos
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS vehiculos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cliente_id INTEGER NOT NULL,
+                    patente TEXT UNIQUE NOT NULL,
+                    marca TEXT NOT NULL,
+                    modelo TEXT NOT NULL,
+                    anio INTEGER,
+                    kilometraje_inicial INTEGER,
+                    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+                )
+            ''')
+
+            # Tabla Turnos (Actualizada para consistencia con app.py)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS turnos (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    cliente_id INTEGER NOT NULL,
+                    vehiculo_id INTEGER NOT NULL,
+                    mecanico_id INTEGER,
+                    fecha TEXT NOT NULL,             -- Almacena la fecha (YYYY-MM-DD)
+                    hora TEXT NOT NULL,              -- Almacena la hora (HH:MM)
+                    problema_reportado TEXT NOT NULL,
+                    estado TEXT NOT NULL DEFAULT 'Agendado', -- Ej: Agendado, Completado, Cancelado, En Progreso (si pasa a taller)
+                    FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE,
+                    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+                    FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE SET NULL
+                )
+            ''')
+
+            # Tabla Reparaciones (Actualizada con las columnas que esperamos y FKs)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS reparaciones (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vehiculo_id INTEGER NOT NULL,
+                    mecanico_id INTEGER,
+                    fecha_ingreso TEXT NOT NULL,
+                    fecha_salida TEXT,
+                    kilometraje_ingreso INTEGER NOT NULL,
+                    kilometraje_salida INTEGER,
+                    problema_reportado TEXT,
+                    trabajos_realizados TEXT,
+                    repuestos_usados TEXT,
+                    costo_mano_obra REAL,
+                    costo_total REAL,
+                    estado TEXT NOT NULL DEFAULT 'En Progreso', -- Ej: Pendiente, En Progreso, Completado, Cancelado, En Espera de Repuestos
+                    turno_origen_id INTEGER UNIQUE, -- Agregamos UNIQUE para asegurar 1 reparación por turno, si existe
+                    FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
+                    FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE SET NULL,
+                    FOREIGN KEY (turno_origen_id) REFERENCES turnos(id) ON DELETE SET NULL
+                )
+            ''')
+            
+            conn.commit()
+            print("Base de datos inicializada o verificada correctamente.")
+        except sqlite3.Error as e:
+            print(f"Error al crear tablas: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+# --- Funciones de Gestión de Clientes ---
+def adicionar_cliente(nombre, apellido, telefono, email, dni): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO clientes (nombre, apellido, telefono, email, dni)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (nombre, apellido, telefono, email, dni))
+            conn.commit()
+            return cursor.lastrowid # Devolver el ID del cliente
+        except sqlite3.IntegrityError:
+            print(f"Error: El DNI '{dni}' ya está registrado para otro cliente.")
+            return False
+        except sqlite3.Error as e:
+            print(f"Error al adicionar cliente: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def obtener_todos_los_clientes(): # Nombre de función corregido
+    conn = obtener_conexion()
+    clientes = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, nombre, apellido, telefono, email, dni FROM clientes ORDER BY apellido, nombre')
+            raw_clientes = cursor.fetchall()
+            clientes = [dict(row) for row in raw_clientes]
+        except sqlite3.Error as e:
+            print(f"Error al obtener todos los clientes: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return clientes
+
+def obtener_cliente_por_id(cliente_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    cliente = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, nombre, apellido, telefono, email, dni FROM clientes WHERE id = ?', (cliente_id,))
+            raw_cliente = cursor.fetchone()
+            if raw_cliente:
+                cliente = dict(raw_cliente)
+        except sqlite3.Error as e:
+            print(f"Error al obtener cliente por ID: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return cliente
+
+# Función para obtener cliente por username de usuarios_clientes (para la app cliente)
+def obtener_cliente_por_username(username): # Nombre de función corregido
+    conn = obtener_conexion()
+    cliente_data = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT c.id, c.nombre, c.apellido, c.telefono, c.email, c.dni, uc.username
+                FROM clientes c
+                JOIN usuarios_clientes uc ON c.id = uc.cliente_id
+                WHERE uc.username = ?
+            ''', (username,))
+            raw_cliente = cursor.fetchone()
+            if raw_cliente:
+                cliente_data = dict(raw_cliente)
+        except sqlite3.Error as e:
+            print(f"Error al obtener cliente por username: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return cliente_data
+
+
+def actualizar_cliente(cliente_id, nombre, apellido, telefono, email, dni): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE clientes
+                SET nombre = ?, apellido = ?, telefono = ?, email = ?, dni = ?
+                WHERE id = ?
+            ''', (nombre, apellido, telefono, email, dni, cliente_id))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            print(f"Error: El DNI '{dni}' ya está registrado para otro cliente al actualizar.")
+            return False
+        except sqlite3.Error as e:
+            print(f"Error al actualizar cliente: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def eliminar_cliente(cliente_id): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # ON DELETE CASCADE en las FKs de vehiculos y turnos se encargará de eliminar los relacionados
+            cursor.execute('DELETE FROM clientes WHERE id = ?', (cliente_id,))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al eliminar cliente: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+# Funciones de cliente_app (registro y login de clientes)
+def obtener_cliente_por_nombre_apellido(nombre, apellido): # Nombre de función corregido
+    conn = obtener_conexion()
+    cliente = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, nombre, apellido, telefono, email, dni FROM clientes WHERE nombre = ? AND apellido = ?', (nombre, apellido))
+            raw_cliente = cursor.fetchone()
+            if raw_cliente:
+                cliente = dict(raw_cliente)
+        except sqlite3.Error as e:
+            print(f"Error al obtener cliente por nombre y apellido: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return cliente
+
+def registrar_cliente_con_usuario(nombre, apellido, username, password, telefono=None, email=None, dni=None): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            
+            # 1. Verificar si el username ya existe
+            cursor.execute('SELECT id FROM usuarios_clientes WHERE username = ?', (username,))
+            if cursor.fetchone():
+                return False, "El nombre de usuario ya existe."
+            
+            # 2. Intentar agregar el cliente. Si el DNI es UNIQUE y ya existe, fallará aquí.
+            # DNI podría ser NULL, si el usuario se registra sin él inicialmente.
+            try:
+                cursor.execute('''
+                    INSERT INTO clientes (nombre, apellido, telefono, email, dni)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (nombre, apellido, telefono, email, dni))
+                cliente_id = cursor.lastrowid
+            except sqlite3.IntegrityError:
+                # Si falla por DNI duplicado y el DNI fue proporcionado
+                if dni:
+                    return False, f"El DNI '{dni}' ya está registrado."
+                else: # Si el error de integridad no fue por DNI y DNI era nulo, es otro problema
+                    raise # Propagar el error si no es un caso conocido
+
+            # 3. Hashear la contraseña
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+            # 4. Insertar el usuario asociado al cliente
+            cursor.execute('''
+                INSERT INTO usuarios_clientes (cliente_id, username, password)
+                VALUES (?, ?, ?)
+            ''', (cliente_id, username, hashed_password))
+            
+            conn.commit()
+            return True, "Cliente y usuario registrados con éxito."
+        except sqlite3.Error as e:
+            print(f"Error en registrar_cliente_con_usuario: {e}")
+            return False, f"Error al registrar: {e}"
+        finally:
+            if conn:
+                conn.close()
+    return False, "Error de conexión a la base de datos."
+
+
+def verificar_credenciales_cliente(username, password): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    cliente_data = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT uc.password, c.id AS cliente_id, uc.id AS usuario_cliente_id, uc.username FROM usuarios_clientes uc JOIN clientes c ON uc.cliente_id = c.id WHERE uc.username = ?', (username,))
+            user_record = cursor.fetchone()
+
+            if user_record:
+                stored_hashed_password = user_record['password'].encode('utf-8')
+                if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                    cliente_data = dict(user_record)
+                    del cliente_data['password'] 
+            
+        except sqlite3.Error as e:
+            print(f"Error al verificar credenciales de cliente: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return cliente_data
+
+
+# --- Funciones de Gestión de Mecánicos ---
+def adicionar_mecanico(nombre, apellido, telefono, email, username, password): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # Paso 1: Insertar el mecánico en la tabla 'mecanicos'
+            cursor.execute('''
+                INSERT INTO mecanicos (nombre, apellido, telefono, email)
+                VALUES (?, ?, ?, ?)
+            ''', (nombre, apellido, telefono, email))
+            mecanico_id = cursor.lastrowid # Obtener el ID del mecánico recién insertado
+
+            # Paso 2: Hashear la contraseña antes de guardarla
+            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+            # Paso 3: Insertar las credenciales en la tabla 'usuarios_mecanicos'
+            cursor.execute('''
+                INSERT INTO usuarios_mecanicos (mecanico_id, username, password)
+                VALUES (?, ?, ?)
+            ''', (mecanico_id, username, hashed_password))
+            
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            print(f"Error: El nombre de usuario '{username}' ya existe o hay un problema de integridad.")
+            return False
+        except sqlite3.Error as e:
+            print(f"Error al adicionar mecánico y usuario: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def obtener_todos_los_mecanicos(): # Nombre de función corregido
+    conn = obtener_conexion()
+    mecanicos = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, nombre, apellido, telefono, email FROM mecanicos ORDER BY apellido, nombre')
+            raw_mecanicos = cursor.fetchall()
+            mecanicos = [dict(row) for row in raw_mecanicos]
+        except sqlite3.Error as e:
+            print(f"Error al obtener todos los mecánicos: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return mecanicos
+
+def obtener_mecanico_por_id(mecanico_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    mecanico = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, nombre, apellido, telefono, email FROM mecanicos WHERE id = ?', (mecanico_id,))
+            raw_mecanico = cursor.fetchone()
+            if raw_mecanico:
+                mecanico = dict(raw_mecanico)
+        except sqlite3.Error as e:
+            print(f"Error al obtener mecánico por ID: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return mecanico
+
+def actualizar_mecanico(mecanico_id, nombre, apellido, telefono, email): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE mecanicos
+                SET nombre = ?, apellido = ?, telefono = ?, email = ?
+                WHERE id = ?
+            ''', (nombre, apellido, telefono, email, mecanico_id))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al actualizar mecánico: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def eliminar_mecanico(mecanico_id): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # ON DELETE CASCADE en usuarios_mecanicos eliminará el usuario asociado.
+            cursor.execute('DELETE FROM mecanicos WHERE id = ?', (mecanico_id,))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al eliminar mecánico: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def verificar_credenciales_mecanico(username, password): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    mecanico_data = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT um.password, m.* FROM usuarios_mecanicos um JOIN mecanicos m ON um.mecanico_id = m.id WHERE um.username = ?', (username,))
+            user_record = cursor.fetchone()
+
+            if user_record:
+                stored_hashed_password = user_record['password'].encode('utf-8')
+                if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                    mecanico_data = dict(user_record)
+                    del mecanico_data['password'] # No devolver el hash de la contraseña
+            
+        except sqlite3.Error as e:
+            print(f"Error al verificar credenciales de mecánico: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return mecanico_data
+
+
+# --- Funciones de Gestión de Vehículos ---
+def adicionar_veiculo(cliente_id, patente, marca, modelo, anio, kilometraje_inicial): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO vehiculos (cliente_id, patente, marca, modelo, anio, kilometraje_inicial)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (cliente_id, patente, marca, modelo, anio, kilometraje_inicial))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            print(f"Error: La patente '{patente}' ya existe.")
+            return False
+        except sqlite3.Error as e:
+            print(f"Error al adicionar vehículo: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def obtener_vehiculos_por_cliente(cliente_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    veiculos = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT v.id, v.cliente_id, v.patente, v.marca, v.modelo, v.anio, v.kilometraje_inicial,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente
+                FROM vehiculos v
+                JOIN clientes c ON v.cliente_id = c.id
+                WHERE v.cliente_id = ?
+                ORDER BY v.patente
+            ''', (cliente_id,))
+            raw_veiculos = cursor.fetchall()
+            veiculos = [dict(row) for row in raw_veiculos]
+        except sqlite3.Error as e:
+            print(f"Error al obtener vehículos por cliente {cliente_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return veiculos
+
+def obtener_veiculo_por_id(veiculo_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    veiculo = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT v.id, v.cliente_id, v.patente, v.marca, v.modelo, v.anio, v.kilometraje_inicial,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente
+                FROM vehiculos v
+                JOIN clientes c ON v.cliente_id = c.id
+                WHERE v.id = ?
+            ''', (veiculo_id,))
+            raw_veiculo = cursor.fetchone()
+            if raw_veiculo:
+                veiculo = dict(raw_veiculo)
+        except sqlite3.Error as e:
+            print(f"Error al obtener vehículo por ID {veiculo_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return veiculo
+
+def actualizar_veiculo(veiculo_id, marca, modelo, anio, patente, kilometraje_inicial): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE vehiculos
+                SET marca = ?, modelo = ?, anio = ?, patente = ?, kilometraje_inicial = ?
+                WHERE id = ?
+            ''', (marca, modelo, anio, patente, kilometraje_inicial, veiculo_id))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            print(f"Error: La patente '{patente}' ya existe al actualizar otro vehículo.")
+            return False
+        except sqlite3.Error as e:
+            print(f"Error al actualizar vehículo: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def eliminar_veiculo(veiculo_id): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # ON DELETE CASCADE en FKs de reparaciones se encargará de eliminar las relacionadas
+            cursor.execute('DELETE FROM vehiculos WHERE id = ?', (veiculo_id,))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al eliminar vehículo: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+
+# --- Funciones de Gestión de Turnos ---
+def adicionar_turno(cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO turnos (cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, estado)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, 'Agendado'))
+            conn.commit()
+            print(f"Turno agendado con éxito para cliente {cliente_id}, vehículo {vehiculo_id}.")
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al adicionar turno: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def obtener_todos_los_turnos(): # Nombre de función corregido
+    conn = obtener_conexion()
+    turnos = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # Modificado para excluir turnos con estado 'Completado'
+            cursor.execute('''
+                SELECT t.id, t.fecha, t.hora, t.problema_reportado, t.estado,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente,
+                       v.patente, v.marca, v.modelo,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico
+                FROM turnos t
+                JOIN clientes c ON t.cliente_id = c.id
+                JOIN vehiculos v ON t.vehiculo_id = v.id
+                LEFT JOIN mecanicos m ON t.mecanico_id = m.id
+                WHERE t.estado IN ('Agendado', 'En Progreso', 'Cancelado')
+                ORDER BY t.fecha DESC, t.hora DESC
+            ''')
+            raw_turnos = cursor.fetchall()
+            turnos = [dict(row) for row in raw_turnos]
+        except sqlite3.Error as e:
+            print(f"Error al obtener todos los turnos: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return turnos
+
+def obtener_turno_por_id(turno_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    turno = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT t.id, t.cliente_id, t.vehiculo_id, t.mecanico_id, t.fecha, t.hora, t.problema_reportado, t.estado,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente, c.dni, c.telefono, c.email,
+                       v.patente, v.marca AS marca_vehiculo, v.modelo AS modelo_vehiculo, v.anio AS anio_vehiculo,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico
+                FROM turnos t
+                JOIN clientes c ON t.cliente_id = c.id
+                JOIN vehiculos v ON t.vehiculo_id = v.id
+                LEFT JOIN mecanicos m ON t.mecanico_id = m.id
+                WHERE t.id = ?
+            ''', (turno_id,))
+            raw_turno = cursor.fetchone()
+            if raw_turno:
+                turno = dict(raw_turno)
+        except sqlite3.Error as e:
+            print(f"Error al obtener turno por ID {turno_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return turno
+
+def actualizar_turno(turno_id, cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, estado): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE turnos
+                SET cliente_id = ?, vehiculo_id = ?, mecanico_id = ?, fecha = ?, hora = ?, problema_reportado = ?, estado = ?
+                WHERE id = ?
+            ''', (cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, estado, turno_id))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al actualizar turno: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def eliminar_turno(turno_id): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM turnos WHERE id = ?', (turno_id,))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al eliminar turno: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+# --- Funciones de Gestión de Reparaciones ---
+
+def adicionar_reparacao(veiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, turno_origen_id=None): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO reparaciones (vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, estado, turno_origen_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (veiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, 'En Progreso', turno_origen_id))
+            conn.commit()
+            return cursor.lastrowid # Devolver el ID de la nueva reparación
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed: reparaciones.turno_origen_id" in str(e):
+                print(f"Advertencia: Ya existe una reparación para el turno de origen {turno_origen_id}.")
+            else:
+                print(f"Error de integridad al adicionar reparación: {e}")
+            return None
+        except sqlite3.Error as e:
+            print(f"Error al adicionar reparación: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+    return None
+
+def obtener_historial_reparaciones_veiculo(veiculo_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    historial = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT r.id, r.fecha_ingreso, r.fecha_salida, r.kilometraje_ingreso, r.kilometraje_salida,
+                       r.problema_reportado, r.trabajos_realizados, r.repuestos_usados, r.costo_mano_obra, r.costo_total, r.estado,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente, c.id AS cliente_id, v.marca, v.modelo, v.anio, v.patente,
+                       r.turno_origen_id
+                FROM reparaciones r
+                LEFT JOIN mecanicos m ON r.mecanico_id = m.id
+                JOIN vehiculos v ON r.veiculo_id = v.id
+                JOIN clientes c ON v.cliente_id = c.id
+                WHERE r.veiculo_id = ?
+                ORDER BY r.fecha_ingreso DESC, r.id DESC
+            ''', (veiculo_id,))
+            raw_historial = cursor.fetchall()
+            historial = [dict(row) for row in raw_historial]
+        except sqlite3.Error as e:
+            print(f"Error al obtener historial de reparaciones para vehículo {veiculo_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return historial
+
+def obtener_reparacion_por_id(reparacion_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    reparacion = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT r.id, r.veiculo_id, r.mecanico_id, r.fecha_ingreso, r.fecha_salida, r.kilometraje_ingreso, r.kilometraje_salida,
+                       r.problema_reportado, r.trabajos_realizados, r.repuestos_usados, r.costo_mano_obra, r.costo_total, r.estado, r.turno_origen_id,
+                       v.patente, v.marca, v.modelo, v.anio, v.cliente_id,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente, c.dni AS dni_cliente
+                FROM reparaciones r
+                JOIN vehiculos v ON r.veiculo_id = v.id
+                JOIN clientes c ON v.cliente_id = c.id
+                LEFT JOIN mecanicos m ON r.mecanico_id = m.id
+                WHERE r.id = ?
+            ''', (reparacion_id,))
+            raw_reparacion = cursor.fetchone()
+            if raw_reparacion:
+                reparacion = dict(raw_reparacao)
+        except sqlite3.Error as e:
+            print(f"Error al obtener reparación por ID {reparacion_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return reparacion
+
+def actualizar_estado_reparacion(reparacion_id, estado, trabajos_realizados=None, repuestos_usados=None, costo_mano_obra=None, costo_total=None, fecha_salida=None, kilometraje_salida=None): # Mantener el nombre si app.py lo llama así
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            update_query = '''
+                UPDATE reparaciones
+                SET estado = ?
+            '''
+            params = [estado]
+
+            if trabajos_realizados is not None:
+                update_query += ', trabajos_realizados = ?'
+                params.append(trabajos_realizados)
+            if repuestos_usados is not None:
+                update_query += ', repuestos_usados = ?'
+                params.append(repuestos_usados)
+            if costo_mano_obra is not None:
+                update_query += ', costo_mano_obra = ?'
+                params.append(costo_mano_obra)
+            if costo_total is not None:
+                update_query += ', costo_total = ?'
+                params.append(costo_total)
+            if fecha_salida is not None:
+                update_query += ', fecha_salida = ?'
+                params.append(fecha_salida)
+            if kilometraje_salida is not None:
+                update_query += ', kilometraje_salida = ?'
+                params.append(kilometraje_salida)
+
+            update_query += ' WHERE id = ?'
+            params.append(reparacion_id)
+
+            cursor.execute(update_query, tuple(params))
+            conn.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"Error al actualizar estado de reparación {reparacion_id}: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return False
+
+def obtener_reparacion_activa_por_veiculo(veiculo_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    reparacao_activa = None
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT r.id, r.veiculo_id, r.mecanico_id, r.fecha_ingreso, r.kilometraje_ingreso,
+                       r.problema_reportado, r.trabajos_realizados, r.repuestos_usados, r.costo_mano_obra, r.costo_total, r.estado,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico,
+                       v.patente, v.marca, v.modelo
+                FROM reparaciones r
+                LEFT JOIN mecanicos m ON r.mecanico_id = m.id
+                JOIN vehiculos v ON r.veiculo_id = v.id
+                WHERE r.veiculo_id = ? AND r.estado IN ('En Progreso', 'Pendente', 'Em Espera de Peças') 
+                ORDER BY r.fecha_ingreso DESC
+                LIMIT 1
+            ''', (veiculo_id,))
+            raw_reparacao = cursor.fetchone()
+            if raw_reparacao:
+                reparacao_activa = dict(raw_reparacao)
+        except sqlite3.Error as e:
+            print(f"Error al obtener reparación activa para vehículo {veiculo_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return reparacao_activa
+
+def obtener_veiculos_em_oficina(): # Nombre de función corregido
+    conn = obtener_conexion()
+    veiculos_em_oficina = []
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT r.id AS reparacion_id, v.id AS veiculo_id, v.patente, v.marca, v.modelo, v.anio, v.kilometraje_inicial,
+                       c.nombre AS nombre_cliente, c.apellido AS apellido_cliente,
+                       r.estado AS estado_reparacion, r.problema_reportado,
+                       m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico,
+                       r.fecha_ingreso AS fecha_ingreso_oficina,
+                       r.turno_origen_id
+                FROM reparaciones r
+                JOIN vehiculos v ON r.veiculo_id = v.id
+                JOIN clientes c ON v.cliente_id = c.id
+                LEFT JOIN mecanicos m ON r.mecanico_id = m.id
+                WHERE r.estado IN ('En Progreso', 'Pendente', 'Em Espera de Peças')
+                ORDER BY 
+                    CASE r.estado 
+                        WHEN 'En Progreso' THEN 1
+                        WHEN 'Pendente' THEN 2
+                        WHEN 'Em Espera de Peças' THEN 3
+                        ELSE 4 
+                    END,
+                    r.fecha_ingreso DESC
+            ''')
+            raw_data = cursor.fetchall()
+            veiculos_em_oficina = [dict(row) for row in raw_data]
+        except sqlite3.Error as e:
+            print(f"Error al obtener vehículos en oficina: {e}")
+        finally:
+            if conn:
+                conn.close()
+    return veiculos_em_oficina
+
+# Función para crear una reparación a partir de un turno
+def crear_reparacion_desde_turno(turno_id): # Nombre de función corregido
+    conn = obtener_conexion()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # Obtener los datos del turno
+            turno = obtener_turno_por_id(turno_id) # Esta función también podría tener el error
+            if not turno:
+                print(f"Turno con ID {turno_id} no encontrado para crear reparación.")
+                return None
+
+            # Verificar si ya existe una reparación para este turno para evitar duplicados
+            cursor.execute('SELECT id FROM reparaciones WHERE turno_origen_id = ?', (turno_id,))
+            existing_reparacion = cursor.fetchone()
+            if existing_reparacion:
+                print(f"Advertencia: Ya existe una reparación (ID: {existing_reparacion['id']}) para el turno {turno_id}.")
+                return existing_reparacion['id']
+
+            # Insertar la nueva reparación
+            veiculo = obtener_veiculo_por_id(turno['vehiculo_id']) # Esta función también podría tener el error
+            kilometraje_ingreso_reparacion = veiculo['kilometraje_inicial'] if veiculo else 0
+
+            cursor.execute('''
+                INSERT INTO reparaciones (vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, estado, turno_origen_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (turno['vehiculo_id'], turno['mecanico_id'], turno['fecha'], # Usar fecha del turno como fecha_ingreso de la reparación
+                  kilometraje_ingreso_reparacion, 
+                  turno['problema_reportado'], 'En Progreso', turno_id)) # Estado inicial de la reparación 'En Progreso'
+            
+            reparacion_id = cursor.lastrowid
+
+            # Actualizar el estado del turno para 'En Progreso'
+            cursor.execute('UPDATE turnos SET estado = ? WHERE id = ?', ('En Progreso', turno_id))
+            
+            conn.commit()
+            return reparacion_id
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed: reparaciones.turno_origen_id" in str(e):
+                print(f"Error: Intento de crear reparación duplicada para turno {turno_id}. Ya existe.")
+            else:
+                print(f"Error de integridad al adicionar reparación desde turno {turno_id}: {e}")
+            return None
+        except sqlite3.Error as e:
+            print(f"Error al crear reparación desde turno {turno_id}: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+    return None
