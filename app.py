@@ -664,15 +664,15 @@ def create_first_mecanico():
 # ==========================================================
 if __name__ == '__main__':
     gestor_datos.crear_tablas() # Las tablas se crearán en la base de datos local (sqlite por defecto)
-    '''
+    
     # Ejecutar la aplicación Flask para desarrollo local
     # host='127.0.0.1' (o localhost) para que solo sea accesible desde tu máquina
     # port=5000 es el puerto por defecto de Flask
     # debug=True: Habilita el modo de depuración. Esto te dará mensajes de error detallados
     # y recargará el servidor automáticamente cuando hagas cambios en el código.
     # ¡Recuerda poner debug=False para producción!
-    app.run(host='127.0.0.1', port=5000, debug=True)'''
-    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=5000, debug=False)
+    ##port = int(os.environ.get("PORT", 5000))
     
-    app.run(host="0.0.0.0", port=port, debug=False)
+    ##app.run(host="0.0.0.0", port=port, debug=False)
 
