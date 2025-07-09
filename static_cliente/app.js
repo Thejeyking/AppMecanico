@@ -1,4 +1,4 @@
-// static_cliente/bundle.js - Aplicación React Completa
+// static_cliente/app.js - Aplicación React Completa
 
 // *** VERIFICACIÓN CRÍTICA: Asegúrate de que React y ReactDOM estén cargados. ***
 // Estas verificaciones se ejecutan cuando el script se carga.
@@ -119,7 +119,6 @@ const RegisterComponent = ({ onRegisterSuccess, onNavigateToLogin }) => {
     const [nombre_cliente, setNombreCliente] = React.useState(''); 
     const [apellido_cliente, setApellidoCliente] = React.useState('');
     const [message, setMessage] = React.useState('');
-    const [dni_cliente, setDniCliente] = React.useState(''); 
 
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -133,8 +132,7 @@ const RegisterComponent = ({ onRegisterSuccess, onNavigateToLogin }) => {
                     username: username,
                     password: password,
                     nombre_cliente: nombre_cliente, // Asegura que la clave JSON coincide con Flask
-                    apellido_cliente: apellido_cliente, // Asegura que la clave JSON coincide con Flask
-                    dni_cliente: dni_cliente
+                    apellido_cliente: apellido_cliente // Asegura que la clave JSON coincide con Flask
                 })
             });
             const data = await response.json();
@@ -145,7 +143,6 @@ const RegisterComponent = ({ onRegisterSuccess, onNavigateToLogin }) => {
                 setPassword('');
                 setNombreCliente('');
                 setApellidoCliente('');
-                setDniCliente('');
                 // Redirige al login después de un breve retraso
                 setTimeout(onNavigateToLogin, 2000);
             } else {
@@ -182,18 +179,6 @@ const RegisterComponent = ({ onRegisterSuccess, onNavigateToLogin }) => {
                             className: "w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
                             value: password,
                             onChange: (e) => setPassword(e.target.value),
-                            required: true
-                        })
-                    ),
-                    React.createElement("div", { className: "form-group" },
-                        React.createElement("label", { htmlFor: "cliente-dni", className: "block text-gray-700 text-sm font-bold mb-2" }, "Tu DNI:"),
-                        React.createElement("input", {
-                            type: "text",
-                            id: "cliente-dni",
-                            className: "w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
-                            value: dni_cliente,
-                            onChange: (e) => setDniCliente(e.target.value),
-                            placeholder: "Ej. 1278934",
                             required: true
                         })
                     ),
@@ -526,7 +511,7 @@ const App = () => {
         // Verificaciones adicionales para asegurar que los componentes están definidos
         if (typeof LoginComponent !== 'function' || typeof RegisterComponent !== 'function' || typeof DashboardComponent !== 'function' || typeof VehicleDetailComponent !== 'function') {
             console.error("ERROR: Uno o más componentes no son funciones. React no se ha inicializado correctamente.");
-            return //<div style={{textAlign: 'center', color: 'red', fontSize: '1.5em', paddingTop: '50px'}}>Error interno: Componentes de la aplicación no válidos.</div>;
+            return <div style={{textAlign: 'center', color: 'red', fontSize: '1.5em', paddingTop: '50px'}}>Error interno: Componentes de la aplicación no válidos.</div>;
         }
 
         switch (currentView) {
@@ -544,7 +529,7 @@ const App = () => {
                 return selectedVehicle ? (
                     React.createElement(VehicleDetailComponent, { vehicle: selectedVehicle, onBackToDashboard: handleBackToDashboard })
                 ) : (
-                    React.createElement('div', { className: "text-center p-8" }, 'Vehículo no seleccionado.')
+                    React.createElement('div', { className: 'text-center p-8' }, 'Vehículo no seleccionado.')
                 );
             default:
                 // Por defecto, muestra el login si la vista no es reconocida
