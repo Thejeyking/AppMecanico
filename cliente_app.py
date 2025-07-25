@@ -11,7 +11,7 @@ import gestor_datos # Importa el módulo para interactuar con la base de datos
 # 'static_url_path': el prefijo URL para acceder a los archivos estáticos (ej. /static/js/main.js).
 # 'template_folder': donde Flask buscará el archivo HTML principal de React (generalmente index.html).
 cliente_app = Flask(__name__, static_folder='static_cliente', static_url_path='/static', template_folder='templates_cliente')
-cliente_app.secret_key = os.urandom(24).hex() # Clave secreta para sesiones seguras. ¡Esencial para Flask!
+cliente_app.secret_key = os.environ.get("CLIENT_SECRET_KEY", "una_clave_secreta_muy_larga_y_aleatoria_para_pruebas_locales_FIJA")
 
 # ==========================================================
 # Configuración de Base de Datos y Tablas

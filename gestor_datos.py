@@ -2,11 +2,11 @@ import sqlite3
 import bcrypt
 import os
 
-from flask import app
+from flask import app # Asegúrate de que esto no cause un error si 'app' no está disponible globalmente
 import psycopg2
 from psycopg2 import Error as Psycopg2Error
 
-DATABASE_URL = os.environ.get('DATABASE_URL') 
+DATABASE_URL = os.environ.get('DATABASE_URL')
 DATABASE_FILE = 'taller_mecanico.db'
 
 def obtener_conexion():
@@ -40,17 +40,21 @@ def crear_tablas():
             cursor = conn.cursor()
             is_postgresql = isinstance(conn, psycopg2.extensions.connection)
 
-            id_type_sql = 'SERIAL' if is_postgresql else 'INTEGER PRIMARY KEY AUTOINCREMENT'
-            
+            # Define el tipo de ID auto-incremental según la base de datos
+            if is_postgresql:
+                id_type_sql = 'SERIAL PRIMARY KEY' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+            else:
+                id_type_sql = 'INTEGER PRIMARY KEY AUTOINCREMENT' # Para SQLite
+
             # Tabla Clientes
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS clientes (
                     id {id_type_sql},
-                    nombre TEXT NOT NULL,
-                    apellido TEXT NOT NULL,
-                    telefono TEXT,
-                    email TEXT,
-                    dni TEXT UNIQUE
+                    nombre VARCHAR(255) NOT NULL,
+                    apellido VARCHAR(255) NOT NULL,
+                    telefono VARCHAR(50),
+                    email VARCHAR(255),
+                    dni VARCHAR(50) UNIQUE
                 )
             ''')
 
@@ -58,9 +62,9 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS usuarios_clientes (
                     id {id_type_sql},
-                    cliente_id INTEGER UNIQUE NOT NULL,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
+                    cliente_id INT UNIQUE NOT NULL,
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
                     FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
                 )
             ''')
@@ -69,10 +73,10 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS mecanicos (
                     id {id_type_sql},
-                    nombre TEXT NOT NULL,
-                    apellido TEXT NOT NULL,
-                    telefono TEXT,
-                    email TEXT
+                    nombre VARCHAR(255) NOT NULL,
+                    apellido VARCHAR(255) NOT NULL,
+                    telefono VARCHAR(50),
+                    email VARCHAR(255)
                 )
             ''')
 
@@ -80,9 +84,9 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS usuarios_mecanicos (
                     id {id_type_sql},
-                    mecanico_id INTEGER UNIQUE NOT NULL,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
+                    mecanico_id INT UNIQUE NOT NULL,
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
                     FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE CASCADE
                 )
             ''')
@@ -91,12 +95,12 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS vehiculos (
                     id {id_type_sql},
-                    cliente_id INTEGER NOT NULL,
-                    patente TEXT UNIQUE NOT NULL,
-                    marca TEXT NOT NULL,
-                    modelo TEXT NOT NULL,
-                    anio INTEGER,
-                    kilometraje_inicial INTEGER,
+                    cliente_id INT NOT NULL,
+                    patente VARCHAR(50) UNIQUE NOT NULL,
+                    marca VARCHAR(255) NOT NULL,
+                    modelo VARCHAR(255) NOT NULL,
+                    anio INT,
+                    kilometraje_inicial INT,
                     FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
                 )
             ''')
@@ -105,13 +109,13 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS turnos (
                     id {id_type_sql},
-                    cliente_id INTEGER NOT NULL,
-                    vehiculo_id INTEGER NOT NULL,
-                    mecanico_id INTEGER,
-                    fecha TEXT NOT NULL,
-                    hora TEXT NOT NULL,
+                    cliente_id INT NOT NULL,
+                    vehiculo_id INT NOT NULL,
+                    mecanico_id INT,
+                    fecha VARCHAR(50) NOT NULL,
+                    hora VARCHAR(50) NOT NULL,
                     problema_reportado TEXT NOT NULL,
-                    estado TEXT NOT NULL DEFAULT 'Agendado',
+                    estado VARCHAR(50) NOT NULL DEFAULT 'Agendado',
                     FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE,
                     FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
                     FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE SET NULL
@@ -122,25 +126,25 @@ def crear_tablas():
             cursor.execute(f'''
                 CREATE TABLE IF NOT EXISTS reparaciones (
                     id {id_type_sql},
-                    vehiculo_id INTEGER NOT NULL,
-                    mecanico_id INTEGER,
-                    fecha_ingreso TEXT NOT NULL,
-                    fecha_salida TEXT,
-                    kilometraje_ingreso INTEGER NOT NULL,
-                    kilometraje_salida INTEGER,
+                    vehiculo_id INT NOT NULL,
+                    mecanico_id INT,
+                    fecha_ingreso VARCHAR(50) NOT NULL,
+                    fecha_salida VARCHAR(50),
+                    kilometraje_ingreso INT NOT NULL,
+                    kilometraje_salida INT,
                     problema_reportado TEXT,
                     trabajos_realizados TEXT,
                     repuestos_usados TEXT,
-                    costo_mano_obra REAL,
-                    costo_total REAL,
-                    estado TEXT NOT NULL DEFAULT 'En Progreso',
-                    turno_origen_id INTEGER UNIQUE,
+                    costo_mano_obra DECIMAL(10, 2),
+                    costo_total DECIMAL(10, 2),
+                    estado VARCHAR(50) NOT NULL DEFAULT 'En Progreso',
+                    turno_origen_id INT UNIQUE,
                     FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE CASCADE,
                     FOREIGN KEY (mecanico_id) REFERENCES mecanicos(id) ON DELETE SET NULL,
                     FOREIGN KEY (turno_origen_id) REFERENCES turnos(id) ON DELETE SET NULL
                 )
             ''')
-            
+
             conn.commit()
             print("Base de datos inicializada o verificada correctamente.")
         except (sqlite3.Error, Psycopg2Error) as e:
@@ -149,38 +153,89 @@ def crear_tablas():
             if conn:
                 conn.close()
 
+# --- Funciones auxiliares (adaptadas para PostgreSQL) ---
 def _map_row_to_dict(cursor, row):
-    """
-    Mapea una tupla de resultados de Psycopg2 o una fila de SQLite a un diccionario.
-    Maneja el caso donde los nombres de las columnas pueden colisionar en joins (ej. 'id').
-    """
+    """Mapea una fila de resultados a un diccionario."""
     if not row:
         return None
-    
-    # Obtener los nombres de las columnas del cursor.description
-    # cursor.description es una lista de tuplas (name, type_code, display_size, internal_size, precision, scale, null_ok)
+    # Asegúrate de que el row_factory esté configurado para devolver diccionarios o mapea manualmente
+    # Para psycopg2, si no se usa DictCursor, devuelve tuplas.
+    # Para sqlite3, si se usa row_factory = sqlite3.Row, devuelve objetos Row accesibles como diccionarios.
+    # Esta lógica es genérica para ambos si cursor.description es consistente.
     columns = [desc[0] for desc in cursor.description]
-    
-    # Crear el diccionario. Si hay nombres de columna duplicados (ej. 'id'),
-    # el último valor sobrescribirá al anterior, lo cual es el comportamiento deseado
-    # si los aliases no se usaron bien en la consulta SQL.
-    # Esto es una alternativa a sqlite3.Row si los resultados no se obtienen directamente como Row.
-    result_dict = {}
-    for i, col_name in enumerate(columns):
-        result_dict[col_name] = row[i]
-    return result_dict
+    return {col_name: row[i] for i, col_name in enumerate(columns)}
 
-
-# Auxiliar para obtener el marcador de posición correcto
 def _get_param_placeholder(conn):
+    """Auxiliar para obtener el marcador de posición correcto para la base de datos."""
+    # PostgreSQL y Psycopg2 usan %s
+    # SQLite usa ?
     return '%s' if isinstance(conn, psycopg2.extensions.connection) else '?'
 
-# Auxiliar para obtener el ID de una inserción (maneja RETURNING para Pg, lastrowid para SQLite)
-def _get_inserted_id(conn, cursor):
-    if isinstance(conn, psycopg2.extensions.connection):
-        return cursor.fetchone()[0]
-    else:
-        return cursor.lastrowid
+def _obtener_cliente_por_dni(conn, dni):
+    """
+    Función auxiliar para obtener un cliente por su DNI.
+    Recibe la conexión para ser usada dentro de una transacción existente.
+    """
+    cliente = None
+    try:
+        cursor = conn.cursor()
+        placeholder = _get_param_placeholder(conn)
+	# ### DEBUG ###
+        print(f"### DEBUG _obtener_cliente_por_dni: Buscando DNI: {dni}")
+        cursor.execute(f'SELECT id, nombre, apellido, telefono, email, dni FROM clientes WHERE dni = {placeholder}', (dni,))
+        raw_cliente = cursor.fetchone()
+        if raw_cliente:
+                cliente = _map_row_to_dict(cursor, raw_cliente)
+                # ### DEBUG ###
+                print(f"### DEBUG _obtener_cliente_por_dni: DNI {dni} ENCONTRADO. Cliente ID: {cliente['id']}")
+        else:
+                # ### DEBUG ###
+                print(f"### DEBUG _obtener_cliente_por_dni: DNI {dni} NO ENCONTRADO.")
+    except (sqlite3.Error, Psycopg2Error) as e:
+        print(f"Error en _obtener_cliente_por_dni: {e}")
+        # No se hace rollback aquí, ya que esta función es auxiliar y la transacción se maneja externamente
+    return cliente
+
+# --- FUNCIÓN AUXILIAR FALTANTE: _obtener_usuario_cliente_por_cliente_id ---
+def _obtener_usuario_cliente_por_cliente_id(conn, cliente_id):
+    """
+    Función auxiliar para obtener un usuario_cliente por su cliente_id.
+    """
+    usuario = None
+    try:
+        cursor = conn.cursor()
+        placeholder = _get_param_placeholder(conn)
+        cursor.execute(f'SELECT id, username, cliente_id FROM usuarios_clientes WHERE cliente_id = {placeholder}', (cliente_id,))
+        raw_usuario = cursor.fetchone()
+        if raw_usuario:
+            usuario = _map_row_to_dict(cursor, raw_usuario)
+    except (sqlite3.Error, Psycopg2Error) as e:
+        print(f"Error en _obtener_usuario_cliente_por_cliente_id: {e}")
+    return usuario
+
+# --- FUNCIÓN AUXILIAR FALTANTE: _obtener_usuario_cliente_por_username ---
+def _obtener_usuario_cliente_por_username(conn, username):
+    """
+    Función auxiliar para obtener un usuario_cliente por su nombre de usuario.
+    """
+    usuario = None
+    try:
+        cursor = conn.cursor()
+        placeholder = _get_param_placeholder(conn)
+        cursor.execute(f'SELECT id, username, cliente_id FROM usuarios_clientes WHERE username = {placeholder}', (username,))
+        raw_usuario = cursor.fetchone()
+        if raw_usuario:
+            usuario = _map_row_to_dict(cursor, raw_usuario)
+    except (sqlite3.Error, Psycopg2Error) as e:
+        print(f"Error en _obtener_usuario_cliente_por_username: {e}")
+    return usuario
+
+
+# MODIFICACIÓN CLAVE: _get_inserted_id ahora no se usa directamente para PostgreSQL,
+# en su lugar, la función que hace el INSERT leerá el ID de cursor.fetchone()
+# después de un INSERT ... RETURNING id.
+# Mantendremos la función para compatibilidad con SQLite si es necesario,
+# pero las funciones de inserción se adaptarán.
 
 # --- Funciones de Gestión de Clientes ---
 def agregar_cliente(nombre, apellido, telefono, email, dni):
@@ -189,17 +244,22 @@ def agregar_cliente(nombre, apellido, telefono, email, dni):
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
-            
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
+
             query = f'''
                 INSERT INTO clientes (nombre, apellido, telefono, email, dni)
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                query += ' RETURNING id'
+            if is_postgresql:
+                query += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
 
             cursor.execute(query, (nombre, apellido, telefono, email, dni))
-            cliente_id = _get_inserted_id(conn, cursor)
             
+            if is_postgresql:
+                cliente_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                cliente_id = cursor.lastrowid # Para SQLite
+
             conn.commit()
             return cliente_id
         except (sqlite3.IntegrityError, Psycopg2Error) as e:
@@ -302,7 +362,6 @@ def eliminar_cliente(cliente_id):
             if conn: conn.close()
     return False
 
-# Funciones de cliente_app (registro y login de clientes)
 def obtener_cliente_por_nombre_apellido(nombre, apellido):
     conn = obtener_conexion()
     cliente = None
@@ -320,144 +379,94 @@ def obtener_cliente_por_nombre_apellido(nombre, apellido):
             if conn: conn.close()
     return cliente
 
-###################################################################################################
-'''
-def _map_row_to_dict(cursor, row):
-    """Mapea una fila de resultados a un diccionario."""
-    if not row:
-        return None
-    columns = [desc[0] for desc in cursor.description]
-    return {col_name: row[i] for i, col_name in enumerate(columns)}
-
-def _get_param_placeholder(conn):
-    """Auxiliar para obtener el marcador de posición correcto para la base de datos."""
-    return '%s' if isinstance(conn, psycopg2.extensions.connection) else '?'
-
-def _get_inserted_id(conn, cursor):
-    """Auxiliar para obtener el ID de una inserción (maneja RETURNING para Pg, lastrowid para SQLite)."""
-    if isinstance(conn, psycopg2.extensions.connection):
-        return cursor.fetchone()[0]
-    else:
-        return cursor.lastrowid
-'''
-# --- Nuevas funciones auxiliares para registro de clientes ---
-
-def _obtener_cliente_por_dni(conn, dni):
-    """Obtiene un cliente por su DNI. Retorna dict o None."""
-    cursor = conn.cursor()
-    placeholder = _get_param_placeholder(conn)
-    cursor.execute(f'SELECT id, nombre, apellido FROM clientes WHERE dni = {placeholder}', (dni,))
-    raw_cliente = cursor.fetchone()
-    return _map_row_to_dict(cursor, raw_cliente)
-
-def _obtener_usuario_cliente_por_username(conn, username):
-    """Obtiene un usuario_cliente por su username. Retorna dict o None."""
-    cursor = conn.cursor()
-    placeholder = _get_param_placeholder(conn)
-    cursor.execute(f'SELECT id, cliente_id FROM usuarios_clientes WHERE username = {placeholder}', (username,))
-    raw_user = cursor.fetchone()
-    return _map_row_to_dict(cursor, raw_user)
-
-def _obtener_usuario_cliente_por_cliente_id(conn, cliente_id):
-    """Obtiene un usuario_cliente por su cliente_id. Retorna dict o None."""
-    print(cliente_id)
-    cursor = conn.cursor()
-    placeholder = _get_param_placeholder(conn)
-    cursor.execute(f'SELECT id, username FROM usuarios_clientes WHERE cliente_id = {placeholder}', (cliente_id,))
-    raw_user = cursor.fetchone()
-    print(raw_user)
-    return _map_row_to_dict(cursor, raw_user)
-
-
 def registrar_cliente_con_usuario(nombre, apellido, username, password, dni):
-    """
-    Registra un cliente y su usuario.
-    Maneja 3 escenarios:
-    1. DNI existente y con usuario: Notifica que ya tiene cuenta.
-    2. DNI existente pero sin usuario: Asocia el nuevo usuario al cliente existente.
-    3. DNI no existente: Crea un nuevo cliente y un nuevo usuario.   
-    """
     conn = obtener_conexion()
     if not conn:
+	# ### DEBUG ###
+        print("### DEBUG registrar_cliente_con_usuario: NO SE PUDO OBTENER CONEXIÓN A LA DB.")
         return False, "Error de conexión a la base de datos."
 
     try:
         placeholder = _get_param_placeholder(conn)
+        is_postgresql = isinstance(conn, psycopg2.extensions.connection)
 
-        # 1. Validar si el DNI ya existe en la tabla de clientes
-        cliente_existente_por_dni = dni
-        #if dni: # Solo busca por DNI si se proporciona
+	# ### DEBUG ###
+        print(f"### DEBUG registrar_cliente_con_usuario: Intentando registrar cliente: {nombre} {apellido}, DNI: {dni}, User: {username}")
+
         cliente_existente_por_dni = _obtener_cliente_por_dni(conn, dni)
-        print(cliente_existente_por_dni)
         if cliente_existente_por_dni:
-            # Caso A: Cliente encontrado por DNI
-            print(f"DEBUG gestor_datos: Cliente existente por DNI: {cliente_existente_por_dni['id']}")
+            ### DEBUG ###
+            print(f"### DEBUG registrar_cliente_con_usuario: Cliente con DNI {dni} YA EXISTE. ID: {cliente_existente_por_dni['id']}")
             usuario_existente_para_cliente = _obtener_usuario_cliente_por_cliente_id(conn, cliente_existente_por_dni['id'])
-            print("Finalizo hascta aca")
             if usuario_existente_para_cliente:
-                # Caso A.1: DNI existe Y ya tiene una cuenta de usuario
-                print(f"DEBUG gestor_datos: Usuario ya existente para cliente {cliente_existente_por_dni['id']}.")
                 return False, "Ya existe una cuenta asociada a este DNI. Por favor, inicia sesión."
-            
-            
             else:
-                # Caso A.2: DNI existe PERO no tiene cuenta de usuario (lo creó un mecánico)
-                # Verificar si el username propuesto ya está en uso por otra cuenta
                 if _obtener_usuario_cliente_por_username(conn, username):
-                    print(f"DEBUG gestor_datos: El username '{username}' ya está en uso.")
                     return False, "El nombre de usuario propuesto ya está en uso."
 
-                # Crear el usuario y vincularlo al cliente existente
                 hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 cursor = conn.cursor()
-                cursor.execute(f'''
+                query_insert_user = f'''
                     INSERT INTO usuarios_clientes (cliente_id, username, password)
                     VALUES ({placeholder}, {placeholder}, {placeholder})
-                ''', (cliente_existente_por_dni['id'], username, hashed_password))
+                '''
+                if is_postgresql:
+                    query_insert_user += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+		# ### DEBUG ###
+                print(f"### DEBUG registrar_cliente_con_usuario: Ejecutando INSERT de usuario para cliente ID {cliente_existente_por_dni['id']}")
+
+                cursor.execute(query_insert_user, (cliente_existente_por_dni['id'], username, hashed_password))
+
+
+                # No necesitamos el ID del usuario_cliente para este flujo, pero lo obtenemos si se usa RETURNING
+                if is_postgresql:
+                    _ = cursor.fetchone()[0] # Consumir el resultado de RETURNING si existe
+
                 conn.commit()
-                print(f"DEBUG gestor_datos: Usuario '{username}' asociado al cliente existente con DNI: {dni}.")
                 return True, "Cuenta creada y asociada a su DNI existente. Ahora puedes iniciar sesión."
         else:
-            # Caso B: DNI NO existe (o no se proporcionó), proceder con nuevo registro
-            # Primero, verificar si el username ya está en uso
             if _obtener_usuario_cliente_por_username(conn, username):
-                print(f"DEBUG gestor_datos: El username '{username}' ya está en uso.")
                 return False, "El nombre de usuario ya existe. Por favor, elige otro."
 
-            # Crear un nuevo cliente (y posiblemente el DNI si se proporcionó)
             cursor = conn.cursor()
             insert_cliente_sql = f'''
                 INSERT INTO clientes (nombre, apellido, dni)
                 VALUES ({placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                insert_cliente_sql += ' RETURNING id'
-            
-            # Si el DNI es None, se pasará None a la DB, lo cual es manejado por la tabla.
-            cursor.execute(insert_cliente_sql, (nombre, apellido, dni))
-            cliente_id = _get_inserted_id(conn, cursor)
-            print(f"DEBUG gestor_datos: Nuevo cliente creado con ID: {cliente_id}")
+            if is_postgresql:
+                insert_cliente_sql += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
 
-            # Hashear la contraseña
+            cursor.execute(insert_cliente_sql, (nombre, apellido, dni))
+            
+            if is_postgresql:
+                cliente_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                cliente_id = cursor.lastrowid # Para SQLite
+
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-            # Insertar el usuario asociado al cliente nuevo
-            cursor.execute(f'''
+            query_insert_user = f'''
                 INSERT INTO usuarios_clientes (cliente_id, username, password)
                 VALUES ({placeholder}, {placeholder}, {placeholder})
-            ''', (cliente_id, username, hashed_password))
+            '''
+            if is_postgresql:
+                query_insert_user += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+
+            cursor.execute(query_insert_user, (cliente_id, username, hashed_password))
+            
+            if is_postgresql:
+                _ = cursor.fetchone()[0] # Consumir el resultado de RETURNING si existe
 
             conn.commit()
-            print(f"DEBUG gestor_datos: Cliente y usuario '{username}' registrados con éxito.")
             return True, "Registro exitoso. ¡Bienvenido! Ya puedes iniciar sesión."
 
     except (sqlite3.IntegrityError, Psycopg2Error) as e:
         conn.rollback()
-        # Mensajes de error más específicos basados en la excepción
-        if "unique constraint" in str(e).lower():
-            if "usuarios_clientes_username_key" in str(e).lower() or "usuarios_clientes.username" in str(e).lower():
+        error_message = str(e).lower()
+        if "duplicate entry" in error_message or "unique constraint" in error_message: # Adaptado para mensajes de error de PostgreSQL
+            if "username" in error_message:
                 return False, "El nombre de usuario ya está registrado."
-            elif "clientes_dni_key" in str(e).lower() or "clientes.dni" in str(e).lower():
+            elif "dni" in error_message:
                 return False, "El DNI ya está registrado por otro cliente."
         print(f"Error de integridad en registrar_cliente_con_usuario: {e}")
         return False, f"Error al registrar: {e}"
@@ -485,8 +494,9 @@ def verificar_credenciales_cliente(username, password):
                 stored_hashed_password = user_record['password'].encode('utf-8')
                 if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
                     cliente_data = user_record
-                    del cliente_data['password'] 
-            
+                    del cliente_data['password']
+            else:
+                print(f"DEBUG: No se encontró usuario '{username}'.")
         except (sqlite3.Error, Psycopg2Error) as e:
             print(f"Error al verificar credenciales de cliente: {e}")
         finally:
@@ -501,27 +511,36 @@ def agregar_mecanico(nombre, apellido, telefono, email, username, password):
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
 
-            # Paso 1: Insertar el mecánico
             query_mecanico = f'''
                 INSERT INTO mecanicos (nombre, apellido, telefono, email)
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                query_mecanico += ' RETURNING id'
-            
-            cursor.execute(query_mecanico, (nombre, apellido, telefono, email))
-            mecanico_id = _get_inserted_id(conn, cursor)
+            if is_postgresql:
+                query_mecanico += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
 
-            # Paso 2: Hashear la contraseña
+            cursor.execute(query_mecanico, (nombre, apellido, telefono, email))
+            
+            if is_postgresql:
+                mecanico_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                mecanico_id = cursor.lastrowid # Para SQLite
+
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-            # Paso 3: Insertar las credenciales
-            cursor.execute(f'''
+            query_user_mecanico = f'''
                 INSERT INTO usuarios_mecanicos (mecanico_id, username, password)
                 VALUES ({placeholder}, {placeholder}, {placeholder})
-            ''', (mecanico_id, username, hashed_password))
+            '''
+            if is_postgresql:
+                query_user_mecanico += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+
+            cursor.execute(query_user_mecanico, (mecanico_id, username, hashed_password))
             
+            if is_postgresql:
+                _ = cursor.fetchone()[0] # Consumir el resultado de RETURNING si existe
+
             conn.commit()
             return True
         except (sqlite3.IntegrityError, Psycopg2Error) as e:
@@ -609,35 +628,32 @@ def verificar_credenciales_mecanico(username, password):
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
-            # SELECCIONAR EXPLÍCITAMENTE LAS COLUMNAS NECESARIAS para evitar conflictos con m.*
-            # o si sqlite3.Row no las incluye todas correctamente.
-            # Cambié m.* por columnas explícitas para mayor robustez.
             cursor.execute(f'''
-                SELECT 
+                SELECT
                     um.password,
-                    m.id AS mecanico_id, 
-                    m.nombre, 
-                    m.apellido, 
-                    m.telefono, 
+                    m.id AS mecanico_id,
+                    m.nombre,
+                    m.apellido,
+                    m.telefono,
                     m.email
-                FROM usuarios_mecanicos um 
-                JOIN mecanicos m ON um.mecanico_id = m.id 
+                FROM usuarios_mecanicos um
+                JOIN mecanicos m ON um.mecanico_id = m.id
                 WHERE um.username = {placeholder}
             ''', (username,))
             user_record_raw = cursor.fetchone()
 
             if user_record_raw:
                 user_record = _map_row_to_dict(cursor, user_record_raw)
-                # El campo 'id' de mecanicos es ahora 'mecanico_id'
-                # Renombramos 'mecanico_id' a 'id' para compatibilidad con el resto del código
-                # Esto es importante para session['user_id']
-                user_record['id'] = user_record['mecanico_id'] 
-
+                user_record['id'] = user_record['mecanico_id']
                 stored_hashed_password = user_record['password'].encode('utf-8')
                 if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
                     mecanico_data = user_record
-                    del mecanico_data['password'] 
-            
+                    del mecanico_data['password']
+                else:
+                    print(f"DEBUG: Contraseña incorrecta para usuario '{username}'.")
+            else:
+                print(f"DEBUG: No se encontró mecánico con usuario '{username}'.")
+
         except (sqlite3.Error, Psycopg2Error) as e:
             print(f"Error al verificar credenciales de mecánico: {e}")
         finally:
@@ -651,15 +667,24 @@ def agregar_vehiculo(cliente_id, patente, marca, modelo, anio, kilometraje_inici
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
+
             query = f'''
                 INSERT INTO vehiculos (cliente_id, patente, marca, modelo, anio, kilometraje_inicial)
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                query += ' RETURNING id'
+            if is_postgresql:
+                query += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+
             cursor.execute(query, (cliente_id, patente, marca, modelo, anio, kilometraje_inicial))
+            
+            if is_postgresql:
+                vehiculo_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                vehiculo_id = cursor.lastrowid # Para SQLite
+
             conn.commit()
-            return True
+            return vehiculo_id # Devolver el ID del vehículo
         except (sqlite3.IntegrityError, Psycopg2Error) as e:
             print(f"Error al agregar vehículo: {e}")
             conn.rollback()
@@ -760,15 +785,24 @@ def agregar_turno(cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_re
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
+
             query = f'''
                 INSERT INTO turnos (cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, estado)
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                query += ' RETURNING id'
+            if is_postgresql:
+                query += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+
             cursor.execute(query, (cliente_id, vehiculo_id, mecanico_id, fecha, hora, problema_reportado, 'Agendado'))
+            
+            if is_postgresql:
+                turno_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                turno_id = cursor.lastrowid # Para SQLite
+
             conn.commit()
-            return True
+            return turno_id # Devolver el ID del turno
         except (sqlite3.Error, Psycopg2Error) as e:
             print(f"Error al agregar turno: {e}")
             conn.rollback()
@@ -790,7 +824,7 @@ def obtener_todos_los_turnos():
                        m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico
                 FROM turnos t
                 JOIN clientes c ON t.cliente_id = c.id
-                JOIN vehiculos v ON t.cliente_id = v.cliente_id -- Corregido: t.vehiculo_id = v.id
+                JOIN vehiculos v ON t.vehiculo_id = v.id
                 LEFT JOIN mecanicos m ON t.mecanico_id = m.id
                 WHERE t.estado IN ('Agendado', 'En Progreso', 'Cancelado')
                 ORDER BY t.fecha DESC, t.hora DESC
@@ -868,6 +902,7 @@ def eliminar_turno(turno_id):
             if conn: conn.close()
     return False
 
+
 # --- Funciones de Gestión de Reparaciones ---
 def agregar_reparacion(vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, turno_origen_id=None):
     conn = obtener_conexion()
@@ -875,18 +910,26 @@ def agregar_reparacion(vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingr
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
+
             query = f'''
                 INSERT INTO reparaciones (vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, estado, turno_origen_id)
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             '''
-            if isinstance(conn, psycopg2.extensions.connection):
-                query += ' RETURNING id'
+            if is_postgresql:
+                query += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
+
             cursor.execute(query, (vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, 'En Progreso', turno_origen_id))
-            reparacion_id = _get_inserted_id(conn, cursor)
+            
+            if is_postgresql:
+                reparacion_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                reparacion_id = cursor.lastrowid # Para SQLite
+
             conn.commit()
             return reparacion_id
         except (sqlite3.IntegrityError, Psycopg2Error) as e:
-            if "unique constraint" in str(e).lower() and "turno_origen_id" in str(e).lower():
+            if "duplicate entry" in str(e).lower() or "unique constraint" in str(e).lower(): # Adaptado para PostgreSQL
                 print(f"Advertencia: Ya existe una reparación para el turno de origen {turno_origen_id}.")
             else:
                 print(f"Error de integridad al agregar reparación: {e}")
@@ -915,9 +958,9 @@ def obtener_historial_reparaciones_vehiculo(vehiculo_id):
                        r.turno_origen_id
                 FROM reparaciones r
                 LEFT JOIN mecanicos m ON r.mecanico_id = m.id
-                JOIN vehiculos v ON r.vehiculo_id = v.id 
+                JOIN vehiculos v ON r.vehiculo_id = v.id
                 JOIN clientes c ON v.cliente_id = c.id
-                WHERE r.vehiculo_id = {placeholder} 
+                WHERE r.vehiculo_id = {placeholder}
                 ORDER BY r.fecha_ingreso DESC, r.id DESC
             ''', (vehiculo_id,))
             raw_historial = cursor.fetchall()
@@ -942,7 +985,7 @@ def obtener_reparacion_por_id(reparacion_id):
                        m.nombre AS nombre_mecanico, m.apellido AS apellido_mecanico,
                        c.nombre AS nombre_cliente, c.apellido AS apellido_cliente, c.dni AS dni_cliente
                 FROM reparaciones r
-                JOIN vehiculos v ON r.vehiculo_id = v.id 
+                JOIN vehiculos v ON r.vehiculo_id = v.id
                 JOIN clientes c ON v.cliente_id = c.id
                 LEFT JOIN mecanicos m ON r.mecanico_id = m.id
                 WHERE r.id = {placeholder}
@@ -962,7 +1005,7 @@ def actualizar_estado_reparacion(reparacion_id, estado, trabajos_realizados=None
         try:
             cursor = conn.cursor()
             placeholder = _get_param_placeholder(conn)
-            
+
             update_query = f'''
                 UPDATE reparaciones
                 SET estado = {placeholder}
@@ -1016,8 +1059,8 @@ def obtener_reparacion_activa_por_vehiculo(vehiculo_id):
                        v.patente, v.marca, v.modelo
                 FROM reparaciones r
                 LEFT JOIN mecanicos m ON r.mecanico_id = m.id
-                JOIN vehiculos v ON r.vehiculo_id = v.id 
-                WHERE r.vehiculo_id = {placeholder} AND r.estado IN ('En Progreso', 'Pendiente', 'En Espera de Piezas') 
+                JOIN vehiculos v ON r.vehiculo_id = v.id
+                WHERE r.vehiculo_id = {placeholder} AND r.estado IN ('En Progreso', 'Pendiente', 'En Espera de Piezas')
                 ORDER BY r.fecha_ingreso DESC
                 LIMIT 1
             ''', (vehiculo_id,))
@@ -1030,7 +1073,7 @@ def obtener_reparacion_activa_por_vehiculo(vehiculo_id):
             if conn: conn.close()
     return reparacion_activa
 
-def obtener_vehiculos_en_taller(): # Nombre de función: obtener_vehiculos_en_taller (ESPAÑOL)
+def obtener_vehiculos_en_taller():
     """
     Obtiene todos los vehículos que tienen una reparación con estado 'En Progreso', 'Pendiente' o 'En Espera de Piezas'.
     """
@@ -1047,102 +1090,86 @@ def obtener_vehiculos_en_taller(): # Nombre de función: obtener_vehiculos_en_ta
                        r.fecha_ingreso AS fecha_ingreso_taller,
                        r.turno_origen_id
                 FROM reparaciones r
-                JOIN vehiculos v ON r.vehiculo_id = v.id 
+                JOIN vehiculos v ON r.vehiculo_id = v.id
                 JOIN clientes c ON v.cliente_id = c.id
                 LEFT JOIN mecanicos m ON r.mecanico_id = m.id
                 WHERE r.estado IN ('En Progreso', 'Pendiente', 'En Espera de Piezas')
-                ORDER BY 
-                    CASE r.estado 
+                ORDER BY
+                    CASE r.estado
                         WHEN 'En Progreso' THEN 1
                         WHEN 'Pendiente' THEN 2
                         WHEN 'En Espera de Piezas' THEN 3
-                        ELSE 4 
+                        ELSE 4
                     END,
                     r.fecha_ingreso DESC
             ''')
             raw_data = cursor.fetchall()
-            vehiculos_en_taller = [dict(row) for row in raw_data]
-        except sqlite3.Error as e:
+            vehiculos_en_taller = [_map_row_to_dict(cursor, row) for row in raw_data]
+        except (sqlite3.Error, Psycopg2Error) as e:
             print(f"Error al obtener vehículos en taller: {e}")
         finally:
             if conn:
                 conn.close()
     return vehiculos_en_taller
 
-# Función para crear una reparación a partir de un turno
-def crear_reparacion_desde_turno(turno_id): # Nombre de función: crear_reparacion_desde_turno (ESPAÑOL)
+def crear_reparacion_desde_turno(turno_id):
     conn = obtener_conexion()
     if conn:
         try:
             cursor = conn.cursor()
-            # Obtener los datos del turno
-            turno = obtener_turno_por_id(turno_id) 
+            placeholder = _get_param_placeholder(conn)
+            is_postgresql = isinstance(conn, psycopg2.extensions.connection)
+
+            turno = obtener_turno_por_id(turno_id)
             if not turno:
                 print(f"Turno con ID {turno_id} no encontrado para crear reparación.")
                 return None
 
-            # Verificar si ya existe una reparación para este turno para evitar duplicados
-            cursor.execute('SELECT id FROM reparaciones WHERE turno_origen_id = ?', (turno_id,))
+            cursor.execute(f'SELECT id FROM reparaciones WHERE turno_origen_id = {placeholder}', (turno_id,))
             existing_reparacion = cursor.fetchone()
             if existing_reparacion:
-                print(f"Advertencia: Ya existe una reparación (ID: {existing_reparacion['id']}) para el turno {turno_id}.")
-                return existing_reparacion['id']
+                print(f"Advertencia: Ya existe una reparación (ID: {existing_reparacion[0]}) para el turno {turno_id}.")
+                return existing_reparacion[0] # Devolver el ID existente
 
-            # Insertar la nueva reparación
-            vehiculo = obtener_vehiculo_por_id(turno['vehiculo_id']) 
+            vehiculo = obtener_vehiculo_por_id(turno['vehiculo_id'])
             kilometraje_ingreso_reparacion = vehiculo['kilometraje_inicial'] if vehiculo else 0
 
-            cursor.execute('''
+            insert_repair_query = f'''
                 INSERT INTO reparaciones (vehiculo_id, mecanico_id, fecha_ingreso, kilometraje_ingreso, problema_reportado, estado, turno_origen_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (turno['vehiculo_id'], turno['mecanico_id'], turno['fecha'], # Usar fecha del turno como fecha_ingreso de la reparación
-                  kilometraje_ingreso_reparacion, 
-                  turno['problema_reportado'], 'En Progreso', turno_id)) # Estado inicial de la reparación 'En Progreso'
-            
-            reparacion_id = cursor.lastrowid
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            '''
+            if is_postgresql:
+                insert_repair_query += ' RETURNING id' # ¡CORRECCIÓN CLAVE para PostgreSQL!
 
-            # *** CAMBIO AQUÍ: Actualizar el estado del turno a 'Completado' ***
-            # Esto lo saca de la lista de turnos activos, pero mantiene el registro.
-            cursor.execute('UPDATE turnos SET estado = ? WHERE id = ?', ('Completado', turno_id))
-            
+            cursor.execute(insert_repair_query, (turno['vehiculo_id'], turno['mecanico_id'], turno['fecha'],
+                                                 kilometraje_ingreso_reparacion,
+                                                 turno['problema_reportado'], 'En Progreso', turno_id))
+
+            if is_postgresql:
+                reparacion_id = cursor.fetchone()[0] # Obtener el ID de RETURNING
+            else:
+                reparacion_id = cursor.lastrowid # Para SQLite
+
+            cursor.execute(f'UPDATE turnos SET estado = {placeholder} WHERE id = {placeholder}', ('Completado', turno_id))
+
             conn.commit()
             return reparacion_id
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE constraint failed: reparaciones.turno_origen_id" in str(e):
+        except (sqlite3.IntegrityError, Psycopg2Error) as e:
+            if "duplicate entry" in str(e).lower() or "unique constraint" in str(e).lower(): # Adaptado para PostgreSQL
                 print(f"Error: Intento de crear reparación duplicada para turno {turno_id}. Ya existe.")
             else:
                 print(f"Error de integridad al agregar reparación desde turno {turno_id}: {e}")
+            conn.rollback()
             return None
-        except sqlite3.Error as e:
+        except (sqlite3.Error, Psycopg2Error) as e:
             print(f"Error al crear reparación desde turno {turno_id}: {e}")
+            conn.rollback()
             return None
         finally:
             if conn:
                 conn.close()
     return None
 
-# Puedes añadir un bloque para pruebas manuales si lo necesitas
 if __name__ == '__main__':
-    # Para forzar el uso de SQLite para pruebas locales, asegúrate de que DATABASE_URL no esté definida.
-    # Si la habías definido manualmente en tu terminal, desconfigúrala antes de ejecutar:
-    # PowerShell: Remove-Item Env:\DATABASE_URL
-    # Bash/Zsh: unset DATABASE_URL
-    
-    # Crea las tablas si no existen (usará SQLite localmente)
     crear_tablas()
-
-    # # BLOQUE DE PRUEBAS MANUALES (COMENTADO POR DEFECTO PARA EVITAR CREACIONES DUPLICADAS)
-    # try:
-    #     print("Intentando agregar mecánico para pruebas...")
-    #     # Intenta crear un mecánico si no existe
-    #     mecanico_agregado = agregar_mecanico("Beto", "Test", "111222333", "beto@taller.com", "Beto", "asd")
-    #     if mecanico_agregado:
-    #         print("Mecánico 'Beto' agregado o ya existe.")
-    #     else:
-    #         print("Fallo al agregar mecánico 'Beto'.")
-    # except Exception as e:
-    #     print(f"Error durante la prueba de agregar_mecanico: {e}")
-
-    # Luego puedes ejecutar la app Flask
-    port = int(os.environ.get("PORT", 5000)) 
-    app.run(host="0.0.0.0", port=port, debug=False)
+    pass
